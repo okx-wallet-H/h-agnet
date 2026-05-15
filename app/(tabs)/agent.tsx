@@ -1,18 +1,11 @@
 import { useMemo, useState } from 'react'
-import {
-  Bot,
-  BrainCircuit,
-  FileClock,
-  Route,
-  ShieldCheck,
-} from 'lucide-react-native'
+import { Bot, FileClock, Route, ShieldCheck } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native'
 
 import { AppText } from '../../src/components/primitives/AppText'
 import { Button } from '../../src/components/primitives/Button'
 import { StatusPill } from '../../src/components/primitives/StatusPill'
-import { ActionTile } from '../../src/components/terminal/ActionTile'
 import { MetricRow } from '../../src/components/terminal/MetricRow'
 import { ScreenHeader } from '../../src/components/terminal/ScreenHeader'
 import { TerminalCard } from '../../src/components/terminal/TerminalCard'
@@ -21,7 +14,6 @@ import {
   useAgentConversationMessages,
   useSendAgentConversationMessage,
 } from '../../src/features/agent/hooks/useAgentConversation'
-import { usePendingStrategyProposal } from '../../src/features/agent/hooks/useStrategyProposal'
 import {
   useAgentRunnerStatus,
   useHSkillRuntimeStatus,
@@ -34,33 +26,15 @@ import { ConversationDataCard } from '../../src/features/cards/components/Conver
 import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
 import { getConfirmationQueueStats } from '../../src/features/cards/model/confirmationQueue'
 import { isApiConfigured } from '../../src/services/api/httpClient'
-
-const agentActions = [
-  {
-    title: '识别',
-    caption: '理解意图',
-    icon: BrainCircuit,
-  },
-  {
-    title: '规划',
-    caption: '生成策略',
-    icon: Route,
-  },
-  {
-    title: '风控',
-    caption: '授权前审查',
-    icon: ShieldCheck,
-  },
-]
+import type { AgentRunnerStatus } from '../../src/services/agent/types'
 
 export default function AgentScreen() {
   const [command, setCommand] = useState(
-    '帮我分析一下我的资产风险，并生成一个需要授权的操作建议',
+    '启动稳健稳定币赚币 Agent，先给我启动卡，不要执行。',
   )
   const backendConfigured = isApiConfigured()
   const messages = useAgentConversationMessages()
   const sendMessage = useSendAgentConversationMessage()
-  const pendingStrategy = usePendingStrategyProposal()
   const runnerStatus = useAgentRunnerStatus()
   const skillRuntime = useHSkillRuntimeStatus()
   const officialStrategies = useOfficialStrategySkills()
@@ -78,185 +52,18 @@ export default function AgentScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ScreenHeader
-        eyebrow="AI 交易助理"
-        title="对话指令台"
-        description="把资产分析、交易准备、充值提现、赚币任务都交给 H Wallet。所有资产动作先生成卡片，再按授权策略推进。"
+        eyebrow="AI Agent Wallet"
+        title="赚币 Agent"
+        description="用一句话启动 Agent。H Wallet 会先生成卡片，授权前不会动用资产；执行状态、暂停原因和回执都会进入卡库。"
         statusLabel={backendConfigured ? '对话就绪' : '后端未配置'}
         statusTone={backendConfigured ? 'gold' : 'muted'}
       />
 
-      <View style={styles.actionRow}>
-        {agentActions.map((action) => (
-          <ActionTile key={action.title} {...action} />
-        ))}
-      </View>
-
-      <TerminalCard style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <View>
-            <AppText variant="caption" color="goldBright">
-              Agent Runner
-            </AppText>
-            <AppText variant="section">赚币 Agent 状态机</AppText>
-          </View>
-          <StatusPill
-            label={formatRunnerState(runnerStatus.data?.state ?? 'idle')}
-            tone={runnerStatus.data?.state === 'blocked' ? 'danger' : 'gold'}
-          />
-        </View>
-        <AppText color="textSecondary">
-          {runnerStatus.data?.summary ?? '等待后端 Runner 状态。'}
-        </AppText>
-        <MetricRow
-          label="真实执行"
-          value={
-            runnerStatus.data?.executionPolicy.realExecutionEnabled
-              ? '已开放'
-              : '未开放'
-          }
-          valueColor={
-            runnerStatus.data?.executionPolicy.realExecutionEnabled
-              ? 'success'
-              : 'danger'
-          }
-        />
-        {runnerStatus.data?.currentRun ? (
-          <MetricRow
-            label="当前运行"
-            value={runnerStatus.data.currentRun.strategyId}
-            valueColor="goldBright"
-          />
-        ) : null}
-        {runnerStatus.data?.currentRun?.authorization ? (
-          <View style={styles.authNotice}>
-            <StatusPill
-              label={
-                runnerStatus.data.currentRun.authorization
-                  .requiredUserAuthorization
-                  ? '等待授权'
-                  : 'Agent 已授权'
-              }
-              tone={
-                runnerStatus.data.currentRun.authorization
-                  .requiredUserAuthorization
-                  ? 'gold'
-                  : 'success'
-              }
-            />
-            <AppText color="textSecondary">
-              {runnerStatus.data.currentRun.authorization.policyReason}
-            </AppText>
-          </View>
-        ) : null}
-        {(runnerStatus.data?.currentRun?.steps ?? []).map((step) => (
-          <View key={step.id} style={styles.runnerStep}>
-            <View style={styles.strategyCopy}>
-              <AppText variant="data">{step.label}</AppText>
-              <AppText variant="caption" color="textMuted">
-                {step.detail}
-              </AppText>
-            </View>
-            <StatusPill
-              label={formatStepStatus(step.status)}
-              tone={getStepTone(step.status)}
-            />
-          </View>
-        ))}
-        {runnerStatus.data?.currentRun?.executionPlan?.length ? (
-          <View style={styles.planList}>
-            <AppText variant="caption" color="goldBright">
-              H Skill 执行计划
-            </AppText>
-            {runnerStatus.data.currentRun.executionPlan.map((step) => (
-              <View key={step.id} style={styles.planStep}>
-                <View style={styles.strategyCopy}>
-                  <AppText variant="data">{step.stage}</AppText>
-                  <AppText variant="caption" color="textMuted">
-                    {step.wrapperId} · {step.providerSkill}
-                  </AppText>
-                  <AppText variant="caption" color="textSecondary">
-                    {step.detail}
-                  </AppText>
-                </View>
-                <StatusPill
-                  label={formatPlanStatus(step.status)}
-                  tone={getPlanTone(step.status)}
-                />
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </TerminalCard>
-
-      <TerminalCard style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <View>
-          <AppText variant="caption" color="goldBright">
-              H Skill Runtime
-            </AppText>
-            <AppText variant="section">封装能力调用协议</AppText>
-          </View>
-          <StatusPill
-            label={skillRuntime.data ? '合约就绪' : '等待'}
-            tone={skillRuntime.data ? 'gold' : 'muted'}
-          />
-        </View>
-        <MetricRow
-          label="封装能力"
-          value={String(skillRuntime.data?.wrapperCount ?? 0)}
-          valueColor="goldBright"
-        />
-        <MetricRow
-          label="空跑次数"
-          value={String(skillRuntime.data?.invocationCount ?? 0)}
-          valueColor="textMuted"
-        />
-        <MetricRow
-          label="真实执行"
-          value={
-            skillRuntime.data?.realExecutionEnabled ? '已开放' : '未开放'
-          }
-          valueColor={
-            skillRuntime.data?.realExecutionEnabled ? 'success' : 'danger'
-          }
-        />
-        <AppText color="textSecondary">
-          {skillRuntime.data?.policy.reason ??
-            '当前只验证 H Skill 调用协议，不调用真实 provider。'}
-        </AppText>
-        {(skillRuntime.data?.hSkillBindings ?? []).slice(0, 4).map((binding) => (
-          <View key={binding.hSkillWrapperId} style={styles.bindingRow}>
-            <View style={styles.strategyCopy}>
-              <AppText variant="data">{binding.hSkillWrapperId}</AppText>
-              <AppText variant="caption" color="textMuted">
-                {binding.providerSkill} · {binding.reason}
-              </AppText>
-            </View>
-            <StatusPill
-              label={binding.status === 'ready' ? '可调用' : '等待'}
-              tone={binding.status === 'ready' ? 'success' : 'muted'}
-            />
-          </View>
-        ))}
-        <Button
-          fullWidth
-          variant="secondary"
-          disabled={!backendConfigured || invokeSkill.isPending}
-          onPress={() =>
-            invokeSkill.mutate({
-              wrapperId: 'H.skill.wallet.getPortfolio',
-              input: { reason: 'agent-runtime-preview' },
-            })
-          }
-        >
-          {invokeSkill.isPending ? '正在读取' : '读取 Agent Wallet 资产'}
-        </Button>
-        {invokeSkill.data ? (
-          <AppText color="textSecondary">
-            {invokeSkill.data.invocation.result.message}
-          </AppText>
-        ) : null}
-      </TerminalCard>
+      <AgentStatusCard
+        backendConfigured={backendConfigured}
+        queueStats={queueStats}
+        runnerStatus={runnerStatus.data}
+      />
 
       <TerminalCard style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
@@ -264,10 +71,13 @@ export default function AgentScreen() {
             <AppText variant="caption" color="goldBright">
               官方赚币策略
             </AppText>
-            <AppText variant="section">Strategy Skill Registry</AppText>
+            <AppText variant="section">选择一个 Agent</AppText>
           </View>
           <StatusPill label="官方策略" tone="purple" />
         </View>
+        <AppText color="textSecondary">
+          新手先用稳健策略。这里不会直接执行真实链上动作，只会生成启动卡和授权流程。
+        </AppText>
         {(officialStrategies.data ?? []).map((strategy) => (
           <View key={strategy.id} style={styles.strategyItem}>
             <View style={styles.strategyHeader}>
@@ -282,18 +92,30 @@ export default function AgentScreen() {
                 tone={strategy.riskLevel === 'low' ? 'success' : 'gold'}
               />
             </View>
-            <MetricRow label="版本" value={strategy.version} />
-            <MetricRow
-              label="H Skill"
-              value={`${strategy.requiredSkillWrappers.length} 个封装能力`}
-              valueColor="goldBright"
-            />
+            <View style={styles.strategyMetaRow}>
+              <View style={styles.strategyMetaPill}>
+                <AppText variant="caption" color="textMuted">
+                  资产
+                </AppText>
+                <AppText variant="caption" color="goldBright">
+                  {strategy.supportedAssets.join(' / ')}
+                </AppText>
+              </View>
+              <View style={styles.strategyMetaPill}>
+                <AppText variant="caption" color="textMuted">
+                  H Skill
+                </AppText>
+                <AppText variant="caption" color="goldBright">
+                  {strategy.requiredSkillWrappers.length} 个
+                </AppText>
+              </View>
+            </View>
             <Button
               fullWidth
               disabled={!backendConfigured || startStrategy.isPending}
               onPress={() => startStrategy.mutate(strategy.id)}
             >
-              {startStrategy.isPending ? '正在创建草案' : '启动草案'}
+              {startStrategy.isPending ? '正在生成启动卡' : '生成启动卡'}
             </Button>
           </View>
         ))}
@@ -304,40 +126,24 @@ export default function AgentScreen() {
         ) : null}
       </TerminalCard>
 
-      {startStrategy.data ? (
-        <TerminalCard style={styles.sectionCard}>
-          <AppText variant="caption" color="goldBright">
-            Agent 启动草案
-          </AppText>
-          <AppText variant="section">{startStrategy.data.strategy.name}</AppText>
-          <MetricRow
-            label="运行状态"
-            value={formatRunStatus(startStrategy.data.run.status)}
-            valueColor="danger"
-          />
-          <MetricRow
-            label="下一步"
-            value={startStrategy.data.run.nextStep}
-            valueColor="textMuted"
-          />
-        </TerminalCard>
-      ) : null}
-
-      <TerminalCard style={styles.chatCard}>
+      <TerminalCard style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
           <View>
             <AppText variant="caption" color="goldBright">
-              指令输入
+              对话指令
             </AppText>
-            <AppText variant="section">先理解，再生成卡片</AppText>
+            <AppText variant="section">像聊天一样下达目标</AppText>
           </View>
           <Bot color={theme.colors.violet} size={22} />
         </View>
+        <AppText color="textSecondary">
+          你可以说“启动稳健赚币 Agent”、“帮我分析资产”或“把 ETH 换成 USDC”。复杂过程会变成卡片。
+        </AppText>
         <TextInput
           editable={backendConfigured}
           multiline
           onChangeText={setCommand}
-          placeholder="告诉 H Wallet 你想分析资产、准备交易、充值提现或参与赚币任务。"
+          placeholder="例如：启动稳健稳定币赚币 Agent"
           placeholderTextColor={theme.colors.textMuted}
           style={styles.promptInput}
           value={command}
@@ -458,42 +264,68 @@ export default function AgentScreen() {
         <View style={styles.sectionHeader}>
           <View>
             <AppText variant="caption" color="goldBright">
-              策略流水线
+              高级信息
             </AppText>
-            <AppText variant="section">模块化执行路径</AppText>
+            <AppText variant="section">H Skill 能力状态</AppText>
           </View>
-          <FileClock color={theme.colors.goldBright} size={22} />
+          <StatusPill
+            label={skillRuntime.data ? '已连接' : '等待'}
+            tone={skillRuntime.data ? 'gold' : 'muted'}
+          />
         </View>
         <MetricRow
-          label="对话 API"
-          value={backendConfigured ? '已配置' : '未配置'}
-          valueColor={backendConfigured ? 'goldBright' : 'textMuted'}
+          label="封装能力"
+          value={String(skillRuntime.data?.wrapperCount ?? 0)}
+          valueColor="goldBright"
         />
-        <MetricRow label="意图识别" value="安全占位合约" />
-        <MetricRow label="策略规划" value="等待真实 AI 后端" />
-        <MetricRow label="风控评估" value="边界已建立" />
-        <MetricRow label="交易提案" value="首次授权" />
-      </TerminalCard>
-
-      <TerminalCard style={styles.proposalCard}>
-        {pendingStrategy.data ? (
-          <View style={styles.proposalHeader}>
-            <StatusPill label="待审阅策略" tone="gold" />
-            <AppText variant="section">{pendingStrategy.data.summary}</AppText>
-            <MetricRow
-              label="识别信心"
-              value={formatConfidence(pendingStrategy.data.confidence)}
-              valueColor="textMuted"
+        <MetricRow
+          label="调用记录"
+          value={String(skillRuntime.data?.invocationCount ?? 0)}
+          valueColor="textMuted"
+        />
+        <MetricRow
+          label="真实执行"
+          value={skillRuntime.data?.realExecutionEnabled ? '已开放' : '未开放'}
+          valueColor={
+            skillRuntime.data?.realExecutionEnabled ? 'success' : 'danger'
+          }
+        />
+        <AppText color="textSecondary">
+          {skillRuntime.data?.policy.reason ??
+            '当前只展示封装能力状态，不要求用户理解底层 provider。'}
+        </AppText>
+        {(skillRuntime.data?.hSkillBindings ?? []).slice(0, 2).map((binding) => (
+          <View key={binding.hSkillWrapperId} style={styles.bindingRow}>
+            <View style={styles.strategyCopy}>
+              <AppText variant="data">{formatHSkillLabel(binding.hSkillWrapperId)}</AppText>
+              <AppText variant="caption" color="textMuted">
+                {binding.providerSkill} · {binding.reason}
+              </AppText>
+            </View>
+            <StatusPill
+              label={binding.status === 'ready' ? '可调用' : '等待'}
+              tone={binding.status === 'ready' ? 'success' : 'muted'}
             />
           </View>
-        ) : (
-          <View style={styles.proposalHeader}>
-            <StatusPill label="暂无待处理动作" tone="muted" />
-            <AppText variant="caption" color="textMuted">
-              AI 生成的动作会以可审阅卡片形式出现在这里。
-            </AppText>
-          </View>
-        )}
+        ))}
+        <Button
+          fullWidth
+          variant="secondary"
+          disabled={!backendConfigured || invokeSkill.isPending}
+          onPress={() =>
+            invokeSkill.mutate({
+              wrapperId: 'H.skill.wallet.getPortfolio',
+              input: { reason: 'agent-runtime-preview' },
+            })
+          }
+        >
+          {invokeSkill.isPending ? '正在读取' : '测试读取钱包资产'}
+        </Button>
+        {invokeSkill.data ? (
+          <AppText color="textSecondary">
+            {invokeSkill.data.invocation.result.message}
+          </AppText>
+        ) : null}
       </TerminalCard>
 
       <Button fullWidth onPress={() => router.push('/agent/strategy')}>
@@ -515,6 +347,190 @@ export default function AgentScreen() {
       </Button>
     </ScrollView>
   )
+}
+
+function AgentStatusCard({
+  backendConfigured,
+  queueStats,
+  runnerStatus,
+}: {
+  backendConfigured: boolean
+  queueStats: ReturnType<typeof getConfirmationQueueStats>
+  runnerStatus?: AgentRunnerStatus
+}) {
+  const currentRun = runnerStatus?.currentRun
+  const currentStep = currentRun?.steps.find(
+    (step) => step.status === 'blocked' || step.status === 'waiting',
+  )
+  const state = runnerStatus?.state ?? 'idle'
+  const statusLabel = formatRunStatus(state)
+  const statusTone =
+    state === 'blocked'
+      ? 'gold'
+      : state === 'idle'
+        ? 'muted'
+        : state === 'completed'
+          ? 'success'
+          : 'purple'
+
+  return (
+    <TerminalCard style={styles.focusCard}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.focusTitle}>
+          <AppText variant="caption" color="goldBright">
+            当前 Agent
+          </AppText>
+          <AppText variant="display">
+            {currentRun ? 'Agent 已创建' : '还没有启动 Agent'}
+          </AppText>
+        </View>
+        <StatusPill label={statusLabel} tone={statusTone} />
+      </View>
+
+      <AppText color="textSecondary">
+        {getAgentStatusCopy({ backendConfigured, runnerStatus })}
+      </AppText>
+
+      {currentRun ? (
+        <View style={styles.runnerDigest}>
+          <View style={styles.digestRow}>
+            <Route color={theme.colors.goldBright} size={18} />
+            <View style={styles.digestCopy}>
+              <AppText variant="caption" color="textMuted">
+                当前策略
+              </AppText>
+              <AppText variant="data">
+                {formatStrategyId(currentRun.strategyId)}
+              </AppText>
+            </View>
+          </View>
+          <View style={styles.digestRow}>
+            <ShieldCheck color={theme.colors.goldBright} size={18} />
+            <View style={styles.digestCopy}>
+              <AppText variant="caption" color="textMuted">
+                暂停原因
+              </AppText>
+              <AppText color="textSecondary">
+                {currentRun.blockReason ?? currentStep?.detail ?? '等待下一步。'}
+              </AppText>
+            </View>
+          </View>
+          <View style={styles.digestRow}>
+            <FileClock color={theme.colors.goldBright} size={18} />
+            <View style={styles.digestCopy}>
+              <AppText variant="caption" color="textMuted">
+                下一步
+              </AppText>
+              <AppText color="textSecondary">{currentRun.nextStep}</AppText>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.runnerDigest}>
+          <View style={styles.digestRow}>
+            <Bot color={theme.colors.goldBright} size={18} />
+            <View style={styles.digestCopy}>
+              <AppText variant="caption" color="textMuted">
+                推荐操作
+              </AppText>
+              <AppText color="textSecondary">
+                先生成一张稳健赚币 Agent 启动卡，再进入授权中心确认。
+              </AppText>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.focusMetrics}>
+        <View style={styles.focusMetric}>
+          <AppText variant="caption" color="textMuted">
+            待授权卡
+          </AppText>
+          <AppText variant="data">{String(queueStats.readyCount)}</AppText>
+        </View>
+        <View style={styles.focusMetric}>
+          <AppText variant="caption" color="textMuted">
+            草案
+          </AppText>
+          <AppText variant="data">{String(queueStats.draftCount)}</AppText>
+        </View>
+        <View style={styles.focusMetric}>
+          <AppText variant="caption" color="textMuted">
+            已暂停
+          </AppText>
+          <AppText variant="data">{String(queueStats.blockedCount)}</AppText>
+        </View>
+      </View>
+
+      <View style={styles.focusActions}>
+        <Button
+          fullWidth
+          variant={queueStats.readyCount > 0 ? 'primary' : 'secondary'}
+          onPress={() => router.push('/confirm')}
+        >
+          打开授权中心
+        </Button>
+        <Button fullWidth variant="ghost" onPress={() => router.push('/cards')}>
+          查看卡库
+        </Button>
+      </View>
+    </TerminalCard>
+  )
+}
+
+function getAgentStatusCopy({
+  backendConfigured,
+  runnerStatus,
+}: {
+  backendConfigured: boolean
+  runnerStatus?: AgentRunnerStatus
+}) {
+  if (!backendConfigured) {
+    return '后端服务还没有连接。连接后可以创建 Agent 启动卡。'
+  }
+
+  if (!runnerStatus?.currentRun) {
+    return '你还没有启动赚币 Agent。先选择一个官方策略，H Wallet 会生成启动卡让你确认。'
+  }
+
+  if (runnerStatus.state === 'blocked') {
+    return 'Agent 已停在安全检查点。它不会继续执行，直到对应 H Skill、OKX adapter 或回执链路准备好。'
+  }
+
+  if (runnerStatus.state === 'waiting-authorization') {
+    return 'Agent 启动卡已经创建，正在等待你到授权中心确认。'
+  }
+
+  if (runnerStatus.state === 'completed') {
+    return 'Agent 本轮结果已经完成，并写入卡库。'
+  }
+
+  return runnerStatus.summary
+}
+
+function formatStrategyId(strategyId: string) {
+  const labels: Record<string, string> = {
+    'official-stable-earn': '稳健稳定币赚币 Agent',
+    'official-smart-rebalance': '智能调仓赚币 Agent',
+  }
+
+  return labels[strategyId] ?? strategyId
+}
+
+function formatHSkillLabel(wrapperId: string) {
+  const labels: Record<string, string> = {
+    'H.skill.wallet.getPortfolio': '读取钱包资产',
+    'H.skill.swap.quote': '获取 Swap 报价',
+    'H.skill.swap.execute': '执行 OKX Swap',
+    'H.skill.risk.scanTransaction': '交易风险扫描',
+    'H.skill.gateway.simulate': '链上模拟',
+    'H.skill.gateway.broadcast': '链上广播',
+    'H.skill.gateway.trackOrder': '状态追踪',
+    'H.skill.defi.deposit': 'DeFi 存入',
+    'H.skill.defi.claim': '收益领取',
+  }
+
+  return labels[wrapperId] ?? wrapperId
 }
 
 function formatIntentLabel(intent: string) {
@@ -567,45 +583,6 @@ function formatRunStatus(status: string) {
   return labels[status] ?? status
 }
 
-function formatRunnerState(state: string) {
-  return formatRunStatus(state)
-}
-
-function formatStepStatus(status: string) {
-  const labels: Record<string, string> = {
-    done: '完成',
-    waiting: '等待',
-    blocked: '阻止',
-  }
-
-  return labels[status] ?? status
-}
-
-function getStepTone(status: string) {
-  if (status === 'done') {
-    return 'success'
-  }
-
-  if (status === 'blocked') {
-    return 'danger'
-  }
-
-  return 'muted'
-}
-
-function formatPlanStatus(status: string) {
-  const labels: Record<string, string> = {
-    ready: '协议就绪',
-    blocked: '等待接入',
-  }
-
-  return labels[status] ?? status
-}
-
-function getPlanTone(status: string) {
-  return status === 'ready' ? 'success' : 'danger'
-}
-
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -617,12 +594,46 @@ const styles = StyleSheet.create({
     paddingBottom: 112,
     backgroundColor: theme.colors.background,
   },
-  actionRow: {
+  focusCard: {
+    gap: theme.spacing.md,
+  },
+  focusTitle: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  runnerDigest: {
+    gap: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+  },
+  digestRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  digestCopy: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  focusMetrics: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
-  chatCard: {
-    gap: theme.spacing.md,
+  focusMetric: {
+    minWidth: 0,
+    flex: 1,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+  },
+  focusActions: {
+    gap: theme.spacing.sm,
   },
   sectionCard: {
     gap: theme.spacing.md,
@@ -651,40 +662,17 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.xs,
   },
-  authNotice: {
+  strategyMetaRow: {
+    flexDirection: 'row',
     gap: theme.spacing.sm,
+  },
+  strategyMetaPill: {
+    flex: 1,
+    gap: theme.spacing.xs,
     borderWidth: 1,
     borderColor: theme.colors.borderMuted,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceElevated,
-    padding: theme.spacing.md,
-  },
-  runnerStep: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderMuted,
-    paddingVertical: theme.spacing.sm,
-  },
-  planList: {
-    gap: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.borderMuted,
-    paddingTop: theme.spacing.md,
-  },
-  planStep: {
-    minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderMuted,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceElevated,
+    backgroundColor: theme.colors.surfaceTerminal,
     padding: theme.spacing.md,
   },
   bindingRow: {
@@ -724,13 +712,6 @@ const styles = StyleSheet.create({
   assistantBubble: {
     borderColor: theme.colors.borderMuted,
     backgroundColor: theme.colors.surfaceElevated,
-  },
-  proposalCard: {
-    minHeight: 104,
-    justifyContent: 'center',
-  },
-  proposalHeader: {
-    gap: theme.spacing.md,
   },
   cardWithActions: {
     gap: theme.spacing.md,
