@@ -58,6 +58,14 @@ export type CardConfirmationResult = {
   } | null
   card: ConversationCard
   receiptCard: ConversationCard
+  runnerStatus?: {
+    id: string
+    status: string
+    stateLabel: string
+    blockReason?: string
+    nextStep?: string
+    steps?: Array<Record<string, unknown>>
+  } | null
 }
 
 export type CardLibraryStats = {

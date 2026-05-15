@@ -4,6 +4,9 @@ const {
 } = require('./agentAuthorizationPolicyService')
 const { evaluateCardLibraryScore } = require('./scoringRulesService')
 const { getCurrentUserId } = require('./userIdentityService')
+const {
+  strategySkillRepository,
+} = require('../repositories/strategySkillRepository')
 
 const cardTypes = new Set([
   'wallet-confirmation',
@@ -139,11 +142,15 @@ function getExecutionReceiptSource(card) {
   return card.source
 }
 
-function createExecutionReceiptCard(card) {
+function createExecutionReceiptCard(card, context = {}) {
   const existingReceipt = findExecutionReceipt(card.id)
 
   if (existingReceipt) {
     return existingReceipt
+  }
+
+  if (isOfficialStrategyCard(card)) {
+    return createStrategyRunnerReceiptCard(card, context.runnerStatus)
   }
 
   const actionLabel = getMetricValue(card, '要做的事', '授权动作')
@@ -180,6 +187,82 @@ function createExecutionReceiptCard(card) {
   })
 }
 
+function createStrategyRunnerReceiptCard(card, runnerStatus) {
+  const actionLabel = getMetricValue(card, '要做的事', '启动赚币 Agent')
+  const strategyName =
+    getMetadataString(card, 'strategyName') ??
+    card.title.replace(/\s*启动草案$/, '')
+  const runId = getMetadataString(card, 'runId')
+  const blockedPlanCount = getMetadataNumber(card, 'blockedPlanCount')
+  const readyPlanCount = getMetadataNumber(card, 'readyPlanCount')
+  const planTotal =
+    runnerStatus?.executionPlan?.length ??
+    (blockedPlanCount !== undefined && readyPlanCount !== undefined
+      ? blockedPlanCount + readyPlanCount
+      : undefined)
+  const planReady =
+    runnerStatus?.executionPlan?.filter((step) => step.status === 'ready')
+      .length ?? readyPlanCount
+  const nextStep =
+    runnerStatus?.nextStep ?? '等待 H Skill Runner 接入真实执行回执。'
+  const blockReason =
+    runnerStatus?.blockReason ?? '当前阶段不会执行真实链上操作。'
+
+  return createCard({
+    type: 'execution-receipt',
+    status: 'confirmed',
+    source: getExecutionReceiptSource(card),
+    userId: card.userId,
+    title: `${strategyName} Runner 状态`,
+    summary:
+      '策略授权已经记录。Agent 已进入 Runner 状态检查；当前不会广播链上交易，也不会伪造收益。',
+    metrics: [
+      { label: '回执类型', value: 'Agent 启动回执', tone: 'gold' },
+      { label: '关联动作', value: actionLabel, tone: 'gold' },
+      { label: 'Agent 状态', value: runnerStatus?.stateLabel ?? '已授权', tone: 'gold' },
+      {
+        label: 'H Skill',
+        value:
+          planTotal && planReady !== undefined
+            ? `${planReady}/${planTotal} 就绪`
+            : '等待检查',
+        tone: planTotal === planReady ? 'gold' : 'muted',
+      },
+      { label: '暂停原因', value: blockReason, tone: 'muted' },
+      { label: '执行状态', value: '未广播', tone: 'danger' },
+      { label: '链上哈希', value: '未生成', tone: 'muted' },
+      { label: '下一步', value: nextStep, tone: 'gold' },
+      { label: '当前状态', value: '已授权', tone: 'gold' },
+    ],
+    metadata: {
+      runnerStatus: runnerStatus
+        ? {
+            blockReason: runnerStatus.blockReason ?? null,
+            nextStep: runnerStatus.nextStep,
+            runId: runnerStatus.id,
+            state: runnerStatus.status,
+            stateLabel: runnerStatus.stateLabel,
+            steps: runnerStatus.steps,
+          }
+        : null,
+      strategyId: getMetadataString(card, 'strategyId') ?? null,
+      strategyName,
+      strategyVersion: getMetadataString(card, 'strategyVersion') ?? null,
+    },
+    tags: [
+      'receipt',
+      'execution',
+      'not-broadcast',
+      'card-library',
+      'agent',
+      'earning-agent',
+      'runner-status',
+      runId ? `run:${runId}` : null,
+      `parent:${card.id}`,
+    ].filter(Boolean),
+  })
+}
+
 function getExecutionReceiptSummary(card) {
   if (card.tags.includes('official-strategy')) {
     return '你的策略授权已经记录。当前版本不会广播链上交易，也不会伪造收益；后续需要 H Skill Wrapper、OKX OnchainOS adapter、风控和执行回执全部完成。'
@@ -194,6 +277,96 @@ function getExecutionReceiptSummary(card) {
   }
 
   return '你的授权已经记录。当前版本不会广播链上交易，也不会生成真实交易哈希；后续结果必须来自后端验证回执。'
+}
+
+function syncStrategyRunAfterAuthorization(card, authorizationGrant) {
+  if (!isOfficialStrategyCard(card)) {
+    return null
+  }
+
+  const runId = getMetadataString(card, 'runId')
+
+  if (!runId) {
+    return null
+  }
+
+  const run = strategySkillRepository.findRunById(runId)
+
+  if (!run) {
+    return null
+  }
+
+  const blockedStep = run.executionPlan.find((step) => step.status === 'blocked')
+  const nextStatus = blockedStep ? 'blocked' : 'planning'
+  const nextStateLabel = blockedStep ? '已暂停' : '已授权'
+  const blockReason = blockedStep
+    ? `等待 ${blockedStep.stage} 的真实 OKX / OnchainOS adapter。`
+    : '真实执行回执链路尚未开放。'
+  const nextStep = blockedStep
+    ? `优先接入 ${blockedStep.wrapperId}。`
+    : '等待 H Skill Runner 接入真实执行回执。'
+
+  return strategySkillRepository.updateRun(runId, (currentRun) => ({
+    ...currentRun,
+    authorization: {
+      ...currentRun.authorization,
+      authorizationGrantId:
+        authorizationGrant?.id ??
+        currentRun.authorization.authorizationGrantId ??
+        null,
+      authorizationStatus: 'agent-authorized',
+      executionMode: 'agent-authorized-pending-adapter',
+      policyReason: '策略授权已记录。',
+      requiredUserAuthorization: false,
+      safetyGate: 'agent-policy-authorized',
+    },
+    blockReason,
+    nextStep,
+    stateLabel: nextStateLabel,
+    status: nextStatus,
+    steps: currentRun.steps.map((step) => {
+      if (step.id === 'waiting-authorization') {
+        return {
+          ...step,
+          detail: '策略授权已记录。',
+          status: 'done',
+        }
+      }
+
+      if (step.id === 'executing') {
+        return {
+          ...step,
+          detail: blockReason,
+          status: blockedStep ? 'blocked' : 'waiting',
+        }
+      }
+
+      return step
+    }),
+    updatedAt: nowIso(),
+  }))
+}
+
+function isOfficialStrategyCard(card) {
+  return (
+    card.type === 'system-status' &&
+    card.tags.includes('official-strategy') &&
+    typeof card.metadata?.authorizationScope === 'string'
+  )
+}
+
+function getMetadataString(card, key) {
+  const value = card.metadata?.[key]
+
+  return typeof value === 'string' && value.trim().length > 0
+    ? value
+    : null
+}
+
+function getMetadataNumber(card, key) {
+  const value = card.metadata?.[key]
+
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function validateString(input, fieldName) {
@@ -490,11 +663,7 @@ function confirmCardReview(cardId) {
   }
 
   if (card.status === 'confirmed') {
-    return {
-      authorizationGrant: applyAuthorizationGrantFromCard(card),
-      card,
-      receiptCard: createExecutionReceiptCard(card),
-    }
+    return createConfirmationResult(card)
   }
 
   if (card.status !== 'requires-confirmation') {
@@ -507,10 +676,18 @@ function confirmCardReview(cardId) {
 
   updateCardStatus(card, 'confirmed')
 
+  return createConfirmationResult(card)
+}
+
+function createConfirmationResult(card) {
+  const authorizationGrant = applyAuthorizationGrantFromCard(card)
+  const runnerStatus = syncStrategyRunAfterAuthorization(card, authorizationGrant)
+
   return {
-    authorizationGrant: applyAuthorizationGrantFromCard(card),
+    authorizationGrant,
     card,
-    receiptCard: createExecutionReceiptCard(card),
+    receiptCard: createExecutionReceiptCard(card, { runnerStatus }),
+    runnerStatus,
   }
 }
 

@@ -172,6 +172,24 @@ const strategySkillRepository = {
     return run ? clone(run) : null
   },
 
+  updateRun(runId, updater) {
+    const runIndex = strategyRuns.findIndex((item) => item.id === runId)
+
+    if (runIndex < 0) {
+      return null
+    }
+
+    const currentRun = clone(strategyRuns[runIndex])
+    const nextRun =
+      typeof updater === 'function'
+        ? updater(currentRun)
+        : { ...currentRun, ...clone(updater) }
+
+    strategyRuns[runIndex] = clone(nextRun)
+
+    return clone(strategyRuns[runIndex])
+  },
+
   listRuns() {
     return strategyRuns.map(clone)
   },

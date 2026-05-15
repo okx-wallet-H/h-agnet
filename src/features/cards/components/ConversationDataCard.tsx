@@ -129,6 +129,14 @@ export function ConversationDataCard({ card }: ConversationDataCardProps) {
           />
         ) : null}
 
+        {isRunnerStatusCard(card) ? (
+          <RunnerStatusSummary
+            appTheme={appTheme}
+            card={card}
+            styles={styles}
+          />
+        ) : null}
+
         {isOfficialStrategyCard(card) ? (
           <StrategyLaunchSummary
             appTheme={appTheme}
@@ -357,6 +365,76 @@ function StrategyScopeBlock({
   )
 }
 
+function RunnerStatusSummary({
+  appTheme,
+  card,
+  styles,
+}: {
+  appTheme: AppTheme
+  card: ConversationCard
+  styles: ReturnType<typeof createStyles>
+}) {
+  const display = getRunnerDisplay(card)
+
+  return (
+    <View style={styles.runnerPanel}>
+      <View style={styles.runnerHeader}>
+        <View style={styles.strategyMark}>
+          <Route color={appTheme.colors.goldBright} size={18} />
+        </View>
+        <View style={styles.strategyTitleCopy}>
+          <AppText variant="caption" color="goldBright">
+            Agent Runner
+          </AppText>
+          <AppText variant="section">{display.strategyName}</AppText>
+        </View>
+        <StatusPill label={display.stateLabel} tone={display.stateTone} />
+      </View>
+
+      <View style={styles.runnerNotice}>
+        <AppText variant="caption" color="textMuted">
+          暂停原因
+        </AppText>
+        <AppText color="textSecondary">{display.blockReason}</AppText>
+      </View>
+
+      <View style={styles.runnerTimeline}>
+        {display.steps.map((step) => (
+          <View key={step.id} style={styles.runnerStepRow}>
+            <View
+              style={[
+                styles.runnerStepDot,
+                { backgroundColor: step.color },
+              ]}
+            />
+            <View style={styles.runnerStepCopy}>
+              <View style={styles.runnerStepTitle}>
+                <AppText variant="data">{step.label}</AppText>
+                <AppText variant="caption" style={{ color: step.color }}>
+                  {step.statusLabel}
+                </AppText>
+              </View>
+              <AppText variant="caption" color="textMuted">
+                {step.detail}
+              </AppText>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.strategySafetyBox}>
+        <View
+          style={[
+            styles.tradeStateDot,
+            { backgroundColor: appTheme.colors.goldBright },
+          ]}
+        />
+        <AppText color="textSecondary">{display.nextStep}</AppText>
+      </View>
+    </View>
+  )
+}
+
 function TradeExecutionSummary({
   appTheme,
   card,
@@ -563,6 +641,51 @@ function getStrategyDisplay(card: ConversationCard) {
   }
 }
 
+function getRunnerDisplay(card: ConversationCard) {
+  const runnerStatus = getRunnerStatusMetadata(card)
+  const steps = readRunnerSteps(runnerStatus)
+  const stateLabel =
+    readString(runnerStatus, 'stateLabel') ??
+    getMetricValue(card, 'Agent 状态', '已授权')
+  const state = readString(runnerStatus, 'state') ?? 'confirmed'
+
+  return {
+    blockReason:
+      readString(runnerStatus, 'blockReason') ??
+      getMetricValue(card, '暂停原因', '等待执行层。'),
+    nextStep:
+      readString(runnerStatus, 'nextStep') ??
+      getMetricValue(card, '下一步', '等待 H Skill Runner。'),
+    stateLabel,
+    stateTone:
+      state === 'blocked' || stateLabel.includes('暂停')
+        ? ('gold' as const)
+        : ('purple' as const),
+    steps:
+      steps.length > 0
+        ? steps
+        : [
+            {
+              detail: '策略授权已经记录。',
+              id: 'authorization',
+              label: '策略授权',
+              statusLabel: '完成',
+              color: '#18C47C',
+            },
+            {
+              detail: getMetricValue(card, '暂停原因', '等待执行层。'),
+              id: 'runner',
+              label: 'Runner 检查',
+              statusLabel: '等待',
+              color: '#F4D98B',
+            },
+          ],
+    strategyName:
+      readString(card.metadata ?? null, 'strategyName') ??
+      card.title.replace(/\s*Runner 状态$/, ''),
+  }
+}
+
 function getTradeDisplay(card: ConversationCard) {
   const pipeline = getPipelineMetadata(card)
   const intent = getPipelineIntent(pipeline)
@@ -634,6 +757,10 @@ function getTradeDisplay(card: ConversationCard) {
 }
 
 function getTypeLabel(card: ConversationCard) {
+  if (isRunnerStatusCard(card)) {
+    return 'Agent 状态'
+  }
+
   if (isOfficialStrategyCard(card)) {
     return 'Agent 启动'
   }
@@ -643,6 +770,16 @@ function getTypeLabel(card: ConversationCard) {
 
 function isOfficialStrategyCard(card: ConversationCard) {
   return card.tags.includes('official-strategy')
+}
+
+function isRunnerStatusCard(card: ConversationCard) {
+  return card.tags.includes('runner-status')
+}
+
+function getRunnerStatusMetadata(card: ConversationCard) {
+  const runnerStatus = card.metadata?.runnerStatus
+
+  return isRecord(runnerStatus) ? runnerStatus : null
 }
 
 function getPipelineMetadata(card: ConversationCard) {
@@ -696,6 +833,51 @@ function readStringArray(
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string')
     : []
+}
+
+function readRunnerSteps(source: Record<string, unknown> | null) {
+  const value = source?.steps
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter(isRecord)
+    .slice(0, 5)
+    .map((step, index) => {
+      const status = readString(step, 'status') ?? 'waiting'
+
+      return {
+        color: getRunnerStepColor(status),
+        detail: readString(step, 'detail') ?? '等待 Runner 更新。',
+        id: readString(step, 'id') ?? `runner-step-${index}`,
+        label: readString(step, 'label') ?? `步骤 ${index + 1}`,
+        statusLabel: getRunnerStepStatusLabel(status),
+      }
+    })
+}
+
+function getRunnerStepColor(status: string) {
+  if (status === 'done') {
+    return '#18C47C'
+  }
+
+  if (status === 'blocked') {
+    return '#FF4D6D'
+  }
+
+  return '#F4D98B'
+}
+
+function getRunnerStepStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    blocked: '暂停',
+    done: '完成',
+    waiting: '等待',
+  }
+
+  return labels[status] ?? status
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -800,6 +982,7 @@ function formatTag(tag: string) {
     'earning-agent': '赚币 Agent',
     'official-strategy': '官方策略',
     'strategy-skill': 'H Skill',
+    'runner-status': 'Runner',
     quote: '报价',
     'okx-dex': 'OKX DEX',
     'swap-data': '交易数据',
@@ -931,6 +1114,58 @@ function createStyles(appTheme: AppTheme) {
     borderTopWidth: 1,
     borderTopColor: appTheme.colors.borderMuted,
     paddingTop: theme.spacing.md,
+  },
+  runnerPanel: {
+    gap: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: appTheme.colors.border,
+    borderRadius: theme.radius.lg,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(124, 58, 237, 0.08)'
+        : 'rgba(124, 58, 237, 0.055)',
+    padding: theme.spacing.md,
+  },
+  runnerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  runnerNotice: {
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: appTheme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(5, 4, 10, 0.3)'
+        : 'rgba(255, 255, 255, 0.62)',
+    padding: theme.spacing.md,
+  },
+  runnerTimeline: {
+    gap: theme.spacing.md,
+  },
+  runnerStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+  },
+  runnerStepDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    marginTop: 6,
+  },
+  runnerStepCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  runnerStepTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
   tradePanel: {
     gap: theme.spacing.md,
