@@ -1,6 +1,9 @@
 const { executeAgentCommand } = require('../agent/agentCommandPipeline')
 const { createCard } = require('./cardsService')
 const {
+  prepareSwapPipeline,
+} = require('./agentExecutionPipelineService')
+const {
   startOfficialStrategySkill,
 } = require('./strategySkillService')
 
@@ -24,9 +27,10 @@ function createMessage(role, content) {
   return message
 }
 
-function sendAgentConversationMessage(input) {
-  const commandResult = executeAgentCommand(input, {
+async function sendAgentConversationMessage(input) {
+  const commandResult = await executeAgentCommand(input, {
     createCard,
+    prepareSwap: prepareSwapPipeline,
     startOfficialStrategy: startOfficialStrategySkill,
   })
   const userMessage = createMessage('user', commandResult.content)

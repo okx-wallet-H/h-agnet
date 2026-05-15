@@ -694,7 +694,7 @@ async function handleRequest(request, response) {
       const body = await readJsonBody(request)
       sendJson(response, 200, {
         ok: true,
-        data: sendAgentConversationMessage(body),
+        data: await sendAgentConversationMessage(body),
       })
       return
     }

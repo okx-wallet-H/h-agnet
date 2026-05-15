@@ -40,13 +40,14 @@ const intentRules = [
   },
 ]
 
-function executeAgentCommand(input, dependencies) {
+async function executeAgentCommand(input, dependencies) {
   const content = normalizeContent(input?.content)
   const intent = detectIntent(content)
   const handler = commandHandlers[intent] ?? commandHandlers.unknown
-  const commandResult = handler({
+  const commandResult = await handler({
     content,
     createCard: dependencies.createCard,
+    prepareSwap: dependencies.prepareSwap,
     startOfficialStrategy: dependencies.startOfficialStrategy,
   })
   const authorization = evaluateAgentAuthorization(

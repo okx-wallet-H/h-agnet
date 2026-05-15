@@ -24,6 +24,8 @@ const chainHints = [
   { label: 'Solana', keywords: ['solana', 'sol'] },
 ]
 
+const defaultTradeChain = 'Ethereum'
+
 function normalizeContent(input) {
   if (typeof input !== 'string' || input.trim().length === 0) {
     const error = new Error('消息内容不能为空。')
@@ -66,6 +68,12 @@ function detectChain(content) {
       chain.keywords.some((keyword) => normalized.includes(keyword)),
     )?.label ?? '待选择'
   )
+}
+
+function detectTradeChain(content) {
+  const chain = detectChain(content)
+
+  return chain === '待选择' ? defaultTradeChain : chain
 }
 
 function extractAddress(content) {
@@ -139,6 +147,26 @@ function getTradeTargetToken(content) {
   return tokens[0] ?? '待选择'
 }
 
+function extractTradeTokens(content) {
+  const directedMatch = content.match(
+    /\b(USDT|USDC|ETH|BTC|SOL|OKB|OKT|BNB|ARB|MATIC|POL|DOGE|PEPE)\b[\s\S]{0,20}(?:换成|换到|换为|兑换成|兑换为|swap\s+to|to)[\s\S]{0,20}\b(USDT|USDC|ETH|BTC|SOL|OKB|OKT|BNB|ARB|MATIC|POL|DOGE|PEPE)\b/i,
+  )
+
+  if (directedMatch) {
+    return {
+      fromToken: directedMatch[1].toUpperCase(),
+      toToken: directedMatch[2].toUpperCase(),
+    }
+  }
+
+  const tokens = extractTokenSymbols(content)
+
+  return {
+    fromToken: tokens[0] ?? '',
+    toToken: tokens[1] ?? '',
+  }
+}
+
 function getWalletActionTag(walletAction) {
   if (walletAction === '提现') {
     return 'withdraw'
@@ -153,10 +181,12 @@ function getWalletActionTag(walletAction) {
 
 module.exports = {
   detectChain,
+  detectTradeChain,
   detectTradeAction,
   detectWalletAction,
   extractAddress,
   extractAmountToken,
+  extractTradeTokens,
   getTradeTargetToken,
   getWalletActionTag,
   normalizeContent,

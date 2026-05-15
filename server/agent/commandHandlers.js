@@ -1,17 +1,44 @@
 const {
   detectChain,
+  detectTradeChain,
   detectTradeAction,
   detectWalletAction,
   extractAddress,
   extractAmountToken,
+  extractTradeTokens,
   getTradeTargetToken,
   getWalletActionTag,
   shortenAddress,
 } = require('./commandParsers')
 
-function createTradeCommand({ content, createCard }) {
+async function createTradeCommand({ content, createCard, prepareSwap }) {
   const { amount, tokenSymbol } = extractAmountToken(content)
   const tradeAction = detectTradeAction(content)
+  const tradeTokens = extractTradeTokens(content)
+
+  if (tradeAction === '兑换' && typeof prepareSwap === 'function') {
+    const result = await prepareSwap({
+      amount: amount === '待补充' ? '' : amount,
+      authorizationScope: 'trade-autonomy',
+      chain: detectTradeChain(content),
+      fromToken: tradeTokens.fromToken || tokenSymbol,
+      toToken: tradeTokens.toToken || getTradeTargetToken(content),
+    })
+
+    return {
+      actionLabel: tradeAction,
+      adapterRequirement: 'agent-execution-pipeline',
+      assistantText: result.assistantText,
+      authorizationRequest: {
+        requiresAssetAction: true,
+        scope: 'trade-autonomy',
+      },
+      cards: result.cards,
+      pipelineStage: result.stage,
+      requiredConfirmation: true,
+    }
+  }
+
   const card = createCard({
     type: 'trade-confirmation',
     status: 'draft',
