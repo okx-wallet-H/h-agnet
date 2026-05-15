@@ -31,6 +31,7 @@ Ready now:
 * Card Library recording for generated cards
 * OKX DEX quote adapter boundary
 * OKX Transaction API simulation adapter boundary
+* OKX DEX transaction status tracking boundary
 
 Still locked:
 
@@ -133,7 +134,7 @@ Official OKX Swap endpoints to integrate later:
 
 * Quote: `GET /api/v6/dex/aggregator/quote`
 * Swap data: `GET /api/v6/dex/aggregator/swap`
-* Transaction status: OKX DEX transaction-status endpoint for initiated swaps
+* Transaction status: `GET /api/v6/dex/aggregator/history`
 
 These calls stay server-side behind H Wallet APIs.
 
@@ -153,6 +154,10 @@ or transaction status.
 Transaction simulation uses OKX Transaction API as a preflight gate. The OKX
 documentation notes simulation/broadcast availability can depend on allowlist
 access. Any failed simulation remains blocked and cannot be treated as safe.
+
+Transaction status tracking uses `chainIndex + txHash` and returns provider
+status such as `pending`, `success`, or `fail`. A missing or failed status query
+must remain blocked; H Wallet must not infer success from local state.
 
 ## Manual Preflight For Later
 

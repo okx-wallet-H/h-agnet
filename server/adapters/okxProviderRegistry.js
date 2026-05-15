@@ -60,8 +60,9 @@ const providerDefinitions = [
     requiredFor: 'gas 估算、交易模拟、广播和状态追踪',
     statusResolver: () =>
       okxOnchainHttpClient.getProviderStatus({
-        limitation: '当前只开放 simulate；broadcast 仍由授权链路锁定。',
-        supportedMethods: ['simulate'],
+        limitation:
+          '当前只开放 simulate 和 DEX txHash 状态追踪；broadcast 仍由授权链路锁定。',
+        supportedMethods: ['simulate', 'trackOrder'],
       }),
   },
   {

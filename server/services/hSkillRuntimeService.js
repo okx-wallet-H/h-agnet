@@ -431,20 +431,77 @@ async function invokeGatewayTrackOrder(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'gateway-orders-adapter-not-connected',
-    message:
-      '交易状态追踪协议已识别；真实 okx-onchain-gateway orders adapter 尚未接入。H Wallet 不伪造交易状态。',
-    resultData: {
-      trackingGate: 'blocked',
-      trackingProvider: 'okx-onchain-gateway',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-onchain-gateway',
-    },
-  })
+  try {
+    const output = await okxOnchainHttpClient.getSwapHistory(
+      mapGatewayTrackOrderInput(input),
+    )
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-gateway-track-order-rejected',
+        message:
+          'OKX DEX History 未返回成功状态，H Wallet 不伪造交易结果。',
+        resultData: {
+          trackingGate: 'blocked',
+          trackingProvider: 'okx-onchain-gateway',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    if (!hasOkxHistoryRecord(output.response)) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-gateway-track-order-not-found',
+        message:
+          'OKX DEX History 未找到交易记录，H Wallet 不会把空结果当作交易成功。',
+        resultData: {
+          trackingGate: 'blocked',
+          trackingProvider: 'okx-onchain-gateway',
+          action: 'observe',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-gateway-track-order-completed',
+      message: '已通过 OKX DEX History 查询交易状态。',
+      resultData: {
+        trackingGate: 'completed',
+        trackingProvider: 'okx-onchain-gateway',
+        action: 'observe',
+        provider: 'okx-dex-swap-history',
+        source: 'okx-onchainos-api',
+        status: extractOkxHistoryStatus(output.response),
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-gateway-track-order-error',
+      fallbackMessage:
+        'OKX DEX History 查询失败。H Wallet 不伪造交易状态。',
+      error,
+      resultData: {
+        trackingGate: 'blocked',
+        trackingProvider: 'okx-onchain-gateway',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-onchain-gateway',
+      },
+    })
+  }
 }
 
 async function invokeDefiDeposit(wrapper, input) {
@@ -846,21 +903,23 @@ function validateGatewayTrackOrderInput(input) {
   }
 
   const chain = typeof input.chain === 'string' ? input.chain.trim() : ''
-  const address = typeof input.address === 'string' ? input.address.trim() : ''
+  const chainIndex =
+    typeof input.chainIndex === 'string' ? input.chainIndex.trim() : ''
+  const txHash = typeof input.txHash === 'string' ? input.txHash.trim() : ''
 
-  if (!chain) {
+  if (!chain && !chainIndex) {
     return {
       ok: false,
       code: 'gateway-track-chain-required',
-      message: '交易状态追踪需要 chain。',
+      message: '交易状态追踪需要 chain 或 chainIndex。',
     }
   }
 
-  if (!address) {
+  if (!txHash) {
     return {
       ok: false,
-      code: 'gateway-track-address-required',
-      message: '交易状态追踪需要 address。',
+      code: 'gateway-track-tx-hash-required',
+      message: '交易状态追踪需要 txHash。',
     }
   }
 
@@ -1038,6 +1097,32 @@ function mapGatewaySimulateInput(input) {
     txAmount: input.txAmount,
     value: input.value,
   }
+}
+
+function mapGatewayTrackOrderInput(input) {
+  return {
+    chain: input.chain,
+    chainIndex: input.chainIndex,
+    isFromMyProject: input.isFromMyProject,
+    txHash: input.txHash,
+  }
+}
+
+function extractOkxHistoryStatus(response) {
+  const data = response?.data
+  const record = Array.isArray(data) ? data[0] : data
+
+  return typeof record?.status === 'string' ? record.status : 'unknown'
+}
+
+function hasOkxHistoryRecord(response) {
+  const data = response?.data
+
+  if (Array.isArray(data)) {
+    return data.length > 0
+  }
+
+  return Boolean(data && typeof data === 'object')
 }
 
 function getTokenAddress(input, tokenField) {

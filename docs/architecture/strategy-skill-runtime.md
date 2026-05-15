@@ -131,9 +131,10 @@ is connected, execute requests return a blocked result.
 
 `H.skill.gateway.broadcast` and `H.skill.gateway.trackOrder` map to
 `okx-onchain-gateway`. They are for non-swap final-mile transaction broadcast
-and status tracking. Broadcast requires an authorization scope and must remain
-blocked until the adapter is connected. Tracking must never invent transaction
-state.
+and status tracking. Broadcast requires an authorization scope and remains
+blocked. The first tracking adapter reads OKX DEX transaction history by
+`chainIndex + txHash`; it can observe `pending`, `success`, or `fail`, but it
+must never invent transaction state.
 
 `H.skill.defi.deposit` and `H.skill.defi.claim` map to `okx-defi-invest`.
 They are the only current H Skill wrappers for DeFi earning actions. H Wallet

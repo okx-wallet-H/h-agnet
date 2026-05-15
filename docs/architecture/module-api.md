@@ -57,6 +57,8 @@ The first HTTP-backed OKX adapters are read/preflight only:
 * `H.skill.swap.quote` → `GET /api/v6/dex/aggregator/quote`
 * `H.skill.gateway.simulate` →
   `POST /api/v6/dex/pre-transaction/simulate`
+* `H.skill.gateway.trackOrder` →
+  `GET /api/v6/dex/aggregator/history`
 
 Swap execution, broadcast, DeFi deposit, DeFi claim, and reward collection
 remain blocked until authorization, risk gates, adapter responses, and verified

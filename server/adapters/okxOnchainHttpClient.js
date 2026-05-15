@@ -195,6 +195,10 @@ function normalizeChainIndex(input) {
   const value = normalizeRequiredText(input, 'chainIndex').toLowerCase()
   const chainIndex = chainIndexByAlias[value]
 
+  if (/^\d+$/.test(value)) {
+    return value
+  }
+
   if (!chainIndex) {
     const error = new Error(`暂不支持的 chainIndex：${input}`)
     error.code = 'okx-chain-index-unsupported'
