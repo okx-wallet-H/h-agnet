@@ -126,8 +126,10 @@ instead of fake pricing.
 
 `H.skill.swap.execute` also maps to `okx-dex-swap`. OKX owns approve, signing,
 broadcast, tx hash, and execution response. H Wallet only supplies validated
-intent, wallet, authorization scope, and card/audit context. Until the adapter
-is connected, execute requests return a blocked result.
+intent, wallet, authorization scope, and card/audit context. The current adapter
+can request OKX swap transaction data after the authorization policy passes, but
+it does not sign, broadcast, or claim execution success. Missing authorization,
+missing transaction data, or provider errors stay blocked.
 
 `H.skill.gateway.broadcast` and `H.skill.gateway.trackOrder` map to
 `okx-onchain-gateway`. They are for non-swap final-mile transaction broadcast

@@ -55,14 +55,16 @@ but provider commands and credentials remain backend-only.
 The first HTTP-backed OKX adapters are read/preflight only:
 
 * `H.skill.swap.quote` → `GET /api/v6/dex/aggregator/quote`
+* `H.skill.swap.execute` →
+  `GET /api/v6/dex/aggregator/swap` for transaction data only
 * `H.skill.gateway.simulate` →
   `POST /api/v6/dex/pre-transaction/simulate`
 * `H.skill.gateway.trackOrder` →
   `GET /api/v6/dex/aggregator/history`
 
-Swap execution, broadcast, DeFi deposit, DeFi claim, and reward collection
-remain blocked until authorization, risk gates, adapter responses, and verified
-result cards are complete.
+Swap signing, broadcast, DeFi deposit, DeFi claim, and reward collection remain
+blocked until authorization, risk gates, adapter responses, and verified result
+cards are complete.
 
 OKX OnchainOS project credentials are stored as server-only environment
 variables: `OKX_PROJECT_ID`, `OKX_API_KEY`, `OKX_SECRET_KEY`, and

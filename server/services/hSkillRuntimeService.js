@@ -6,6 +6,9 @@ const okxOnchainHttpClient = require('../adapters/okxOnchainHttpClient')
 const {
   getHSkillBindingStatus,
 } = require('../adapters/okxProviderRegistry')
+const {
+  evaluateAgentAuthorization,
+} = require('./agentAuthorizationPolicyService')
 
 function getHSkillRuntimeStatus() {
   const wrappers = strategySkillRepository.listHSkillWrappers()
@@ -362,21 +365,106 @@ async function invokeSwapExecute(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'okx-swap-execute-adapter-not-connected',
-    message:
-      'OKX Swap 执行协议已识别；真实 okx-dex-swap execute adapter 尚未接入。H Wallet 不签名、不广播、不自建交易执行。',
-    resultData: {
-      swapGate: 'blocked',
-      executionProvider: 'okx-dex-swap',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-dex-swap',
-      executionOwner: 'OKX',
-    },
+  const authorization = evaluateAgentAuthorization({
+    requiresAssetAction: true,
+    scope: input.authorizationScope,
   })
+
+  if (authorization.requiredUserAuthorization) {
+    return recordBlockedInvocation({
+      wrapper,
+      input,
+      code: 'swap-execute-authorization-required',
+      message: authorization.policyReason,
+      resultData: {
+        authorization,
+        swapGate: 'blocked',
+        executionProvider: 'okx-dex-swap',
+        action: 'block',
+        failSafe: true,
+      },
+    })
+  }
+
+  try {
+    const output = await okxOnchainHttpClient.getSwapData(
+      mapSwapExecutionInput(input),
+    )
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-swap-data-rejected',
+        message:
+          'OKX Swap 未返回成功交易数据，H Wallet 不生成自有 calldata。',
+        resultData: {
+          authorization,
+          swapGate: 'blocked',
+          executionProvider: 'okx-dex-swap',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    if (!hasOkxSwapTransactionData(output.response)) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-swap-data-missing-transaction',
+        message:
+          'OKX Swap 响应缺少交易数据，H Wallet 不会进入签名或广播。',
+        resultData: {
+          authorization,
+          swapGate: 'blocked',
+          executionProvider: 'okx-dex-swap',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-swap-data-ready',
+      executionMode: 'transaction-build-adapter',
+      message:
+        '已通过 OKX DEX Swap API 生成交易数据；尚未签名、广播或执行。',
+      resultData: {
+        authorization,
+        swapGate: 'transaction-data-ready',
+        executionProvider: 'okx-dex-swap',
+        executionStatus: 'not-signed-not-broadcast',
+        action: 'prepare',
+        provider: 'okx-dex-swap',
+        source: 'okx-onchainos-api',
+        requiresSignature: true,
+        requiresBroadcast: true,
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-swap-data-error',
+      fallbackMessage:
+        'OKX Swap 交易数据请求失败。H Wallet 不生成自有 calldata。',
+      error,
+      resultData: {
+        authorization,
+        swapGate: 'blocked',
+        executionProvider: 'okx-dex-swap',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-dex-swap',
+      },
+    })
+  }
 }
 
 async function invokeGatewayBroadcast(wrapper, input) {
@@ -612,6 +700,7 @@ function recordCompletedInvocation({
   wrapper,
   input,
   code,
+  executionMode = 'read-only-adapter',
   message,
   resultData,
 }) {
@@ -620,7 +709,7 @@ function recordCompletedInvocation({
     wrapperId: wrapper.id,
     providerSkill: wrapper.providerSkill,
     status: 'completed',
-    executionMode: 'read-only-adapter',
+    executionMode,
     createdAt: new Date().toISOString(),
     inputSummary: summarizeInput(input),
     result: {
@@ -704,15 +793,32 @@ function validateGatewaySimulateInput(input) {
   }
 
   const chain = typeof input.chain === 'string' ? input.chain.trim() : ''
-  const from = typeof input.from === 'string' ? input.from.trim() : ''
-  const to = typeof input.to === 'string' ? input.to.trim() : ''
-  const data = typeof input.data === 'string' ? input.data.trim() : ''
+  const chainIndex =
+    typeof input.chainIndex === 'string' ? input.chainIndex.trim() : ''
+  const from =
+    typeof input.from === 'string'
+      ? input.from.trim()
+      : typeof input.fromAddress === 'string'
+        ? input.fromAddress.trim()
+        : ''
+  const to =
+    typeof input.to === 'string'
+      ? input.to.trim()
+      : typeof input.toAddress === 'string'
+        ? input.toAddress.trim()
+        : ''
+  const data =
+    typeof input.data === 'string'
+      ? input.data.trim()
+      : typeof input.inputData === 'string'
+        ? input.inputData.trim()
+        : ''
 
-  if (!chain) {
+  if (!chain && !chainIndex) {
     return {
       ok: false,
       code: 'gateway-simulate-chain-required',
-      message: '链上模拟需要 chain。',
+      message: '链上模拟需要 chain 或 chainIndex。',
     }
   }
 
@@ -816,16 +922,32 @@ function validateSwapExecuteInput(input) {
   }
 
   const wallet = typeof input.wallet === 'string' ? input.wallet.trim() : ''
+  const userWalletAddress =
+    typeof input.userWalletAddress === 'string'
+      ? input.userWalletAddress.trim()
+      : ''
+  const slippagePercent =
+    typeof input.slippagePercent === 'string'
+      ? input.slippagePercent.trim()
+      : ''
   const authorizationScope =
     typeof input.authorizationScope === 'string'
       ? input.authorizationScope.trim()
       : ''
 
-  if (!wallet) {
+  if (!wallet && !userWalletAddress) {
     return {
       ok: false,
       code: 'swap-execute-wallet-required',
-      message: 'OKX Swap 执行需要 wallet。',
+      message: 'OKX Swap 执行需要 wallet 或 userWalletAddress。',
+    }
+  }
+
+  if (!slippagePercent) {
+    return {
+      ok: false,
+      code: 'swap-execute-slippage-required',
+      message: 'OKX Swap 执行需要 slippagePercent。',
     }
   }
 
@@ -1082,6 +1204,35 @@ function mapSwapQuoteInput(input) {
   }
 }
 
+function mapSwapExecutionInput(input) {
+  return {
+    ...mapSwapQuoteInput(input),
+    approveAmount: input.approveAmount,
+    approveTransaction: input.approveTransaction,
+    assetAwareRouting: input.assetAwareRouting,
+    autoSlippage: input.autoSlippage,
+    callDataMemo: input.callDataMemo,
+    computeUnitLimit: input.computeUnitLimit,
+    computeUnitPrice: input.computeUnitPrice,
+    disableRFQ: input.disableRFQ,
+    feePercent: input.feePercent,
+    forJitoBundle: input.forJitoBundle,
+    fromTokenReferrerWalletAddress: input.fromTokenReferrerWalletAddress,
+    gasLevel: input.gasLevel,
+    gasLimit: input.gasLimit,
+    maxAccounts: input.maxAccounts,
+    maxAutoSlippagePercent: input.maxAutoSlippagePercent,
+    maxCalldataSize: input.maxCalldataSize,
+    priceImpactProtectionPercent: input.priceImpactProtectionPercent,
+    slippagePercent: input.slippagePercent,
+    swapReceiverAddress: input.swapReceiverAddress,
+    tips: input.tips,
+    toTokenReferrerWalletAddress: input.toTokenReferrerWalletAddress,
+    userWalletAddress: input.userWalletAddress ?? input.wallet,
+    wallet: input.wallet,
+  }
+}
+
 function mapGatewaySimulateInput(input) {
   return {
     chain: input.chain,
@@ -1123,6 +1274,18 @@ function hasOkxHistoryRecord(response) {
   }
 
   return Boolean(data && typeof data === 'object')
+}
+
+function hasOkxSwapTransactionData(response) {
+  const record = getOkxResponseRecord(response)
+
+  return Boolean(record?.tx?.to && record?.tx?.data)
+}
+
+function getOkxResponseRecord(response) {
+  const data = response?.data
+
+  return Array.isArray(data) ? data[0] : data
 }
 
 function getTokenAddress(input, tokenField) {

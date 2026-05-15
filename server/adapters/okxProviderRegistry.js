@@ -39,8 +39,9 @@ const providerDefinitions = [
     requiredFor: 'OKX Swap 报价和执行',
     statusResolver: () =>
       okxOnchainHttpClient.getProviderStatus({
-        limitation: '当前只开放 quote 和 transaction history；swap execution 仍由授权链路锁定。',
-        supportedMethods: ['quote', 'history'],
+        limitation:
+          '当前开放 quote、swap data 和 transaction history；签名、广播和最终执行仍由授权链路锁定。',
+        supportedMethods: ['quote', 'swapData', 'history'],
       }),
   },
   {
@@ -211,7 +212,7 @@ function getExpectedValue(envName) {
 function getWrapperRequiredProviderMethod(wrapperId) {
   const methodMap = {
     'H.skill.swap.quote': 'quote',
-    'H.skill.swap.execute': 'swap',
+    'H.skill.swap.execute': 'swapData',
     'H.skill.gateway.simulate': 'simulate',
     'H.skill.gateway.broadcast': 'broadcast',
     'H.skill.gateway.trackOrder': 'trackOrder',

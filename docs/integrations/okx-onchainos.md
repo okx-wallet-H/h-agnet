@@ -30,6 +30,7 @@ Ready now:
 * Wallet transfer / withdraw authorization card draft route
 * Card Library recording for generated cards
 * OKX DEX quote adapter boundary
+* OKX DEX swap-data adapter boundary
 * OKX Transaction API simulation adapter boundary
 * OKX DEX transaction status tracking boundary
 
@@ -37,7 +38,7 @@ Still locked:
 
 * Real wallet transfer broadcast
 * Contract call execution
-* Swap execution
+* Swap signing and broadcast
 * Reward claim execution
 
 Out of scope for this document:
@@ -145,11 +146,23 @@ H.skill.swap.quote
 → server-only OKX signed request
 → OKX DEX quote response
 → H Wallet normalized invocation result
+
+H.skill.swap.execute
+→ authorization policy check
+→ server-only OKX signed request
+→ OKX DEX swap transaction data
+→ H Wallet normalized invocation result
+→ still unsigned and unbroadcast
 ```
 
 Quote failures, missing token contract addresses, or provider errors return a
 blocked fail-safe result. H Wallet must not invent prices, routes, tx calldata,
 or transaction status.
+
+Swap-data generation requires a wallet address, explicit slippage, and an active
+authorization scope. It returns OKX router transaction data only; H Wallet must
+not mark it as executed until signature, broadcast, status tracking, and a
+verified result card are complete.
 
 Transaction simulation uses OKX Transaction API as a preflight gate. The OKX
 documentation notes simulation/broadcast availability can depend on allowlist

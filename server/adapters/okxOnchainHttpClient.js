@@ -76,6 +76,53 @@ async function getSwapQuote(input) {
   })
 }
 
+async function getSwapData(input) {
+  return request('GET', '/api/v6/dex/aggregator/swap', {
+    amount: normalizeRequiredText(input.amount, 'amount'),
+    chainIndex: normalizeChainIndex(input.chainIndex ?? input.chain),
+    fromTokenAddress: normalizeRequiredText(
+      input.fromTokenAddress,
+      'fromTokenAddress',
+    ),
+    toTokenAddress: normalizeRequiredText(input.toTokenAddress, 'toTokenAddress'),
+    slippagePercent: normalizeRequiredText(
+      input.slippagePercent,
+      'slippagePercent',
+    ),
+    userWalletAddress: normalizeRequiredText(
+      input.userWalletAddress ?? input.wallet,
+      'userWalletAddress',
+    ),
+    approveAmount: input.approveAmount,
+    approveTransaction: input.approveTransaction,
+    assetAwareRouting: input.assetAwareRouting,
+    autoSlippage: input.autoSlippage,
+    callDataMemo: input.callDataMemo,
+    computeUnitLimit: input.computeUnitLimit,
+    computeUnitPrice: input.computeUnitPrice,
+    dexIds: input.dexIds,
+    directRoute: input.directRoute,
+    disableRFQ: input.disableRFQ,
+    excludeDexIds: input.excludeDexIds,
+    excludePoolAddresses: input.excludePoolAddresses,
+    feePercent: input.feePercent,
+    forJitoBundle: input.forJitoBundle,
+    fromTokenReferrerWalletAddress: input.fromTokenReferrerWalletAddress,
+    gasLevel: input.gasLevel,
+    gasLimit: input.gasLimit,
+    maxAccounts: input.maxAccounts,
+    maxAutoSlippagePercent: input.maxAutoSlippagePercent,
+    maxCalldataSize: input.maxCalldataSize,
+    priceImpactProtectionPercent: input.priceImpactProtectionPercent,
+    singlePoolPerHop: input.singlePoolPerHop,
+    singleRouteOnly: input.singleRouteOnly,
+    swapMode: input.swapMode ?? 'exactIn',
+    swapReceiverAddress: input.swapReceiverAddress,
+    tips: input.tips,
+    toTokenReferrerWalletAddress: input.toTokenReferrerWalletAddress,
+  })
+}
+
 async function simulateTransaction(input) {
   return request('POST', '/api/v6/dex/pre-transaction/simulate', {
     chainIndex: normalizeChainIndex(input.chainIndex ?? input.chain),
@@ -270,6 +317,7 @@ function parseJson(text) {
 module.exports = {
   getProviderStatus,
   getStatus,
+  getSwapData,
   getSwapHistory,
   getSwapQuote,
   normalizeChainIndex,

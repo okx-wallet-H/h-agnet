@@ -93,7 +93,10 @@ export type HSkillInvocation = {
   wrapperId: string
   providerSkill: string
   status: 'blocked' | 'completed'
-  executionMode: 'dry-run-only' | 'read-only-adapter'
+  executionMode:
+    | 'dry-run-only'
+    | 'read-only-adapter'
+    | 'transaction-build-adapter'
   createdAt: string
   inputSummary: Record<string, string>
   result:
