@@ -139,6 +139,17 @@ should not require frontend or screen changes.
 See `docs/architecture/database-schema.md` and
 `docs/database/001_initial_schema.sql` for the first database blueprint.
 
+Production operation planning lives in:
+
+* `docs/operations/production-architecture.md`
+* `docs/operations/ai-knowledge-system.md`
+* `docs/operations/ci-cd.md`
+* `docs/operations/production-readiness-checklist.md`
+
+The first GitHub Actions templates cover repository checks, Expo EAS Update,
+and server deploy. They require owner-provided GitHub secrets before real
+preview or production deployment.
+
 When the backend is configured with `H_AGENT_ONCHAINOS_AUTH_MODE=cli` and
 `ONCHAINOS_CLI_PATH`, the Agent Wallet auth endpoints call:
 

@@ -4,6 +4,9 @@
     "slug": "h-agent",
     "scheme": "hagent",
     "version": "0.1.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,

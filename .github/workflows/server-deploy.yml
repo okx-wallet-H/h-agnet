@@ -1,0 +1,86 @@
+name: Server Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/server-production
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy H API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      H_WALLET_SERVER_HOST: ${{ secrets.H_WALLET_SERVER_HOST }}
+      H_WALLET_SERVER_USER: ${{ secrets.H_WALLET_SERVER_USER }}
+      H_WALLET_SERVER_SSH_KEY: ${{ secrets.H_WALLET_SERVER_SSH_KEY }}
+      H_WALLET_SERVER_APP_DIR: ${{ secrets.H_WALLET_SERVER_APP_DIR }}
+      H_WALLET_SERVER_PORT: ${{ secrets.H_WALLET_SERVER_PORT }}
+      H_WALLET_SERVER_BRANCH: ${{ secrets.H_WALLET_SERVER_BRANCH }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate Deploy Secrets
+        run: |
+          : "${H_WALLET_SERVER_HOST:?Missing H_WALLET_SERVER_HOST secret}"
+          : "${H_WALLET_SERVER_USER:?Missing H_WALLET_SERVER_USER secret}"
+          : "${H_WALLET_SERVER_SSH_KEY:?Missing H_WALLET_SERVER_SSH_KEY secret}"
+          : "${H_WALLET_SERVER_APP_DIR:?Missing H_WALLET_SERVER_APP_DIR secret}"
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$H_WALLET_SERVER_SSH_KEY" > ~/.ssh/h_wallet_deploy_key
+          chmod 600 ~/.ssh/h_wallet_deploy_key
+
+          SERVER_PORT="${H_WALLET_SERVER_PORT:-22}"
+          ssh-keyscan -p "$SERVER_PORT" "$H_WALLET_SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy On Server
+        run: |
+          SERVER_PORT="${H_WALLET_SERVER_PORT:-22}"
+          DEPLOY_BRANCH="${H_WALLET_SERVER_BRANCH:-main}"
+          REMOTE_APP_DIR=$(printf '%q' "$H_WALLET_SERVER_APP_DIR")
+          REMOTE_BRANCH=$(printf '%q' "$DEPLOY_BRANCH")
+
+          ssh -i ~/.ssh/h_wallet_deploy_key -p "$SERVER_PORT" \
+            "$H_WALLET_SERVER_USER@$H_WALLET_SERVER_HOST" \
+            "H_WALLET_SERVER_APP_DIR=$REMOTE_APP_DIR H_WALLET_SERVER_BRANCH=$REMOTE_BRANCH bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$H_WALLET_SERVER_APP_DIR"
+          git fetch origin "$H_WALLET_SERVER_BRANCH"
+          git checkout "$H_WALLET_SERVER_BRANCH"
+          git pull --ff-only origin "$H_WALLET_SERVER_BRANCH"
+          npm ci --omit=dev
+
+          if ! command -v pm2 >/dev/null 2>&1; then
+            echo "pm2 is required on the server." >&2
+            exit 1
+          fi
+
+          pm2 reload h-wallet-api --update-env || pm2 start server/index.js --name h-wallet-api
+          pm2 save
+          REMOTE

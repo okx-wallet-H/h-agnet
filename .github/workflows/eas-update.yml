@@ -1,0 +1,94 @@
+name: Expo EAS Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: EAS update branch
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+      message:
+        description: Update message
+        required: false
+        type: string
+  push:
+    branches:
+      - release/mobile-preview
+
+permissions:
+  contents: read
+
+jobs:
+  eas-update:
+    name: Publish EAS Update
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: eas-update-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      REQUESTED_CHANNEL: ${{ github.event.inputs.channel }}
+      REQUESTED_MESSAGE: ${{ github.event.inputs.message }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate Expo Update Configuration
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "Missing EXPO_TOKEN GitHub secret." >&2
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const { expo } = require('./app.json')
+
+          const missing = []
+          if (!expo?.runtimeVersion) missing.push('expo.runtimeVersion')
+          if (!expo?.updates?.url) missing.push('expo.updates.url')
+          if (!expo?.extra?.eas?.projectId) missing.push('expo.extra.eas.projectId')
+
+          if (missing.length > 0) {
+            console.error(`Missing EAS update config: ${missing.join(', ')}`)
+            console.error('Run: npx eas-cli@latest update:configure')
+            process.exit(1)
+          }
+          NODE
+
+      - name: Resolve Update Branch
+        run: |
+          if [ -n "${REQUESTED_CHANNEL:-}" ]; then
+            echo "EAS_UPDATE_BRANCH=${REQUESTED_CHANNEL}" >> "$GITHUB_ENV"
+          else
+            echo "EAS_UPDATE_BRANCH=preview" >> "$GITHUB_ENV"
+          fi
+
+          if [ -n "${REQUESTED_MESSAGE:-}" ]; then
+            echo "EAS_UPDATE_MESSAGE=${REQUESTED_MESSAGE}" >> "$GITHUB_ENV"
+          else
+            echo "EAS_UPDATE_MESSAGE=CI update ${GITHUB_SHA}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Publish Update
+        run: npx eas-cli@latest update --branch "$EAS_UPDATE_BRANCH" --message "$EAS_UPDATE_MESSAGE" --non-interactive
