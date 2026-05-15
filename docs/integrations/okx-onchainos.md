@@ -29,11 +29,12 @@ Ready now:
 * Agent Wallet OTP verify route
 * Wallet transfer / withdraw authorization card draft route
 * Card Library recording for generated cards
+* OKX DEX quote adapter boundary
+* OKX Transaction API simulation adapter boundary
 
 Still locked:
 
 * Real wallet transfer broadcast
-* Real OKX Swap quote / swap data
 * Contract call execution
 * Swap execution
 * Reward claim execution
@@ -58,10 +59,22 @@ ONCHAINOS_CLI_PATH=/absolute/path/to/onchainos
 For OKX Swap / OnchainOS Open API calls, backend-only credentials are required:
 
 ```bash
+OKX_PROJECT_ID=...
 OKX_API_KEY=...
 OKX_SECRET_KEY=...
 OKX_PASSPHRASE=...
 ```
+
+Optional:
+
+```bash
+OKX_ONCHAINOS_BASE_URL=https://web3.okx.com
+OKX_BUILDER_CODE=...
+```
+
+`OKX_BUILDER_CODE` is an X Layer attribution marker for the H Wallet project.
+It is not an API key, not a wallet authorization, and not a replacement for
+`OKX_PROJECT_ID`.
 
 Do not expose OKX keys, OnchainOS credentials, CLI paths, session tokens, or
 execution credentials through `EXPO_PUBLIC_*`.
@@ -123,6 +136,23 @@ Official OKX Swap endpoints to integrate later:
 * Transaction status: OKX DEX transaction-status endpoint for initiated swaps
 
 These calls stay server-side behind H Wallet APIs.
+
+Current adapter rule:
+
+```txt
+H.skill.swap.quote
+→ server-only OKX signed request
+→ OKX DEX quote response
+→ H Wallet normalized invocation result
+```
+
+Quote failures, missing token contract addresses, or provider errors return a
+blocked fail-safe result. H Wallet must not invent prices, routes, tx calldata,
+or transaction status.
+
+Transaction simulation uses OKX Transaction API as a preflight gate. The OKX
+documentation notes simulation/broadcast availability can depend on allowlist
+access. Any failed simulation remains blocked and cannot be treated as safe.
 
 ## Manual Preflight For Later
 

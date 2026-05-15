@@ -112,14 +112,17 @@ connected, the wrapper must return a blocked fail-safe result. A missing or
 failed risk scan is never treated as safe.
 
 The first simulation-gate invoke target is `H.skill.gateway.simulate`. It maps
-to `okx-onchain-gateway` / `onchainos gateway simulate`. Until the real adapter
-is connected, the wrapper must return a blocked fail-safe result. A missing or
-failed simulation is never treated as executable.
+to `okx-onchain-gateway` / OKX Transaction API simulation. A missing, rejected,
+or failed simulation is never treated as executable. OKX documentation notes
+simulation access can depend on allowlist eligibility, so provider errors remain
+blocked instead of being downgraded to warnings.
 
 Trading is owned by OKX. `H.skill.swap.quote` maps to `okx-dex-swap` quote
 capability. H Wallet must not create its own quote, route, swap calldata, or
-execution engine. Until the OKX swap adapter is connected, quote requests return
-a blocked result instead of fake pricing.
+execution engine. The first connected adapter calls OKX DEX quote through a
+server-only signed request. Quote requests require token contract addresses, not
+only symbols. Missing input or provider errors return a blocked fail-safe result
+instead of fake pricing.
 
 `H.skill.swap.execute` also maps to `okx-dex-swap`. OKX owns approve, signing,
 broadcast, tx hash, and execution response. H Wallet only supplies validated

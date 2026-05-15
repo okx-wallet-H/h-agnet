@@ -52,6 +52,16 @@ server-only adapter readiness for Onchain providers such as Agent Wallet, DEX
 Swap, Security, Gateway, and DeFi Invest. The frontend may display those states,
 but provider commands and credentials remain backend-only.
 
+The first HTTP-backed OKX adapters are read/preflight only:
+
+* `H.skill.swap.quote` → `GET /api/v6/dex/aggregator/quote`
+* `H.skill.gateway.simulate` →
+  `POST /api/v6/dex/pre-transaction/simulate`
+
+Swap execution, broadcast, DeFi deposit, DeFi claim, and reward collection
+remain blocked until authorization, risk gates, adapter responses, and verified
+result cards are complete.
+
 OKX OnchainOS project credentials are stored as server-only environment
 variables: `OKX_PROJECT_ID`, `OKX_API_KEY`, `OKX_SECRET_KEY`, and
 `OKX_PASSPHRASE`.

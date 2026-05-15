@@ -250,6 +250,7 @@ function buildStrategyExecutionPlan(strategy) {
       bindingStatus: binding.status,
       credentialBoundary: binding.credentialBoundary,
       credentialLabel: binding.credentialLabel,
+      requiredProviderMethod: binding.requiredProviderMethod,
       stage,
       status: ready ? 'ready' : 'blocked',
       required: true,

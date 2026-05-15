@@ -41,6 +41,7 @@ export type AgentExecutionPlanStep = {
   bindingStatus?: 'ready' | 'blocked' | 'unknown'
   credentialBoundary?: string
   credentialLabel?: string
+  requiredProviderMethod?: string | null
   id: string
   order: number
   wrapperId: string
@@ -118,6 +119,7 @@ export type HSkillRuntimeStatus = {
     credentialBoundary?: string
     credentialLabel?: string
     hSkillWrapperId: string
+    requiredProviderMethod?: string | null
     providerSkill: string
     providerLabel?: string
     reason: string
@@ -128,7 +130,7 @@ export type HSkillRuntimeStatus = {
   invocationCount: number
   lastInvocation: HSkillInvocation | null
   policy: {
-    mode: 'dry-run-only'
+    mode: 'dry-run-only' | 'read-preflight-only'
     reason: string
   }
 }

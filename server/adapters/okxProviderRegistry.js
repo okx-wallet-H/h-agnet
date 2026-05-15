@@ -1,4 +1,5 @@
 const onchainosWalletAdapter = require('./onchainosWalletAdapter')
+const okxOnchainHttpClient = require('./okxOnchainHttpClient')
 
 const serverOnlyOkxEnv = [
   'OKX_PROJECT_ID',
@@ -36,6 +37,11 @@ const providerDefinitions = [
     transport: 'okx-onchainos-adapter',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: 'OKX Swap 报价和执行',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation: '当前只开放 quote 和 transaction history；swap execution 仍由授权链路锁定。',
+        supportedMethods: ['quote', 'history'],
+      }),
   },
   {
     id: 'okx-security',
@@ -52,6 +58,11 @@ const providerDefinitions = [
     transport: 'okx-onchainos-adapter',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: 'gas 估算、交易模拟、广播和状态追踪',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation: '当前只开放 simulate；broadcast 仍由授权链路锁定。',
+        supportedMethods: ['simulate'],
+      }),
   },
   {
     id: 'okx-defi-invest',
@@ -87,18 +98,26 @@ function getHSkillBindingStatus(wrapper) {
   }
 
   const contractReady = wrapper.status === 'contract-ready'
-  const adapterReady = provider.status === 'ready'
+  const requiredProviderMethod = getWrapperRequiredProviderMethod(wrapper.id)
+  const methodReady =
+    !requiredProviderMethod ||
+    !Array.isArray(provider.supportedMethods) ||
+    provider.supportedMethods.includes(requiredProviderMethod)
+  const adapterReady = provider.status === 'ready' && methodReady
 
   return {
     adapterStatus: provider.status,
     credentialBoundary: provider.credentialBoundary,
     credentialLabel: provider.credentialLabel,
     hSkillWrapperId: wrapper.id,
+    requiredProviderMethod,
     providerSkill: wrapper.providerSkill,
     providerLabel: provider.label,
     reason: adapterReady
       ? 'Provider adapter 已就绪。'
-      : provider.reason,
+      : methodReady
+        ? provider.reason
+        : `Provider adapter 已接入，但 ${requiredProviderMethod} 方法仍未开放。`,
     status: contractReady && adapterReady ? 'ready' : 'blocked',
     wrapperStatus: wrapper.status,
   }
@@ -139,7 +158,9 @@ function createProviderStatus(provider) {
       requiredFor: provider.requiredFor,
       serverOnly: true,
       ...officialCredentialProfile,
+      limitation: status.limitation,
       status: status.status,
+      supportedMethods: status.supportedMethods,
       reason: status.reason,
     }
   }
@@ -184,6 +205,18 @@ function getExpectedValue(envName) {
   }
 
   return 'server-only'
+}
+
+function getWrapperRequiredProviderMethod(wrapperId) {
+  const methodMap = {
+    'H.skill.swap.quote': 'quote',
+    'H.skill.swap.execute': 'swap',
+    'H.skill.gateway.simulate': 'simulate',
+    'H.skill.gateway.broadcast': 'broadcast',
+    'H.skill.gateway.trackOrder': 'trackOrder',
+  }
+
+  return methodMap[wrapperId] ?? null
 }
 
 module.exports = {

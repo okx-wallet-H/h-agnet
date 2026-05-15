@@ -61,7 +61,9 @@ export type OkxProviderAdapterStatus = {
   credentialBoundary: string
   credentialLabel: string
   credentialUse: string
+  limitation?: string
   status: OkxAdapterStatus
+  supportedMethods?: string[]
   reason: string
 }
 

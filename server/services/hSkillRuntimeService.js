@@ -2,6 +2,7 @@ const {
   strategySkillRepository,
 } = require('../repositories/strategySkillRepository')
 const onchainosWalletAdapter = require('../adapters/onchainosWalletAdapter')
+const okxOnchainHttpClient = require('../adapters/okxOnchainHttpClient')
 const {
   getHSkillBindingStatus,
 } = require('../adapters/okxProviderRegistry')
@@ -18,8 +19,9 @@ function getHSkillRuntimeStatus() {
     invocationCount: invocations.length,
     lastInvocation: invocations[0] ?? null,
     policy: {
-      mode: 'dry-run-only',
-      reason: '当前阶段只验证 H Skill 调用协议，不调用真实 OKX OnchainOS 能力。',
+      mode: 'read-preflight-only',
+      reason:
+        '当前已接入 OKX quote / simulate 等只读和预检能力；真实资产执行、广播、DeFi 存入仍未开放。',
     },
   }
 }
@@ -214,20 +216,59 @@ async function invokeGatewaySimulate(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'gateway-adapter-not-connected',
-    message:
-      '链上模拟协议已识别；真实 okx-onchain-gateway simulate adapter 尚未接入。模拟失败不能视为可执行。',
-    resultData: {
-      simulationGate: 'blocked',
-      simulationType: 'gateway-simulate',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-onchain-gateway',
-    },
-  })
+  try {
+    const output = await okxOnchainHttpClient.simulateTransaction(
+      mapGatewaySimulateInput(input),
+    )
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-gateway-simulate-rejected',
+        message:
+          'OKX Transaction API 未返回成功模拟结果，当前交易不能进入执行状态。',
+        resultData: {
+          simulationGate: 'blocked',
+          simulationType: 'gateway-simulate',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-gateway-simulation-completed',
+      message: '已通过 OKX Transaction API 完成交易模拟。',
+      resultData: {
+        simulationGate: 'completed',
+        simulationType: 'gateway-simulate',
+        action: 'observe',
+        provider: 'okx-onchain-gateway',
+        source: 'okx-onchainos-api',
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-gateway-simulate-error',
+      fallbackMessage:
+        'OKX Transaction API 模拟请求失败，模拟失败不能视为可执行。',
+      error,
+      resultData: {
+        simulationGate: 'blocked',
+        simulationType: 'gateway-simulate',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-onchain-gateway',
+      },
+    })
+  }
 }
 
 async function invokeSwapQuote(wrapper, input) {
@@ -248,20 +289,59 @@ async function invokeSwapQuote(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'okx-swap-adapter-not-connected',
-    message:
-      'OKX Swap 报价协议已识别；真实 okx-dex-swap quote adapter 尚未接入。H Wallet 不生成自有报价或路线。',
-    resultData: {
-      swapGate: 'blocked',
-      quoteProvider: 'okx-dex-swap',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-dex-swap',
-    },
-  })
+  try {
+    const output = await okxOnchainHttpClient.getSwapQuote(
+      mapSwapQuoteInput(input),
+    )
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-swap-quote-rejected',
+        message:
+          'OKX Swap 未返回成功报价，H Wallet 不生成自有报价或路线。',
+        resultData: {
+          swapGate: 'blocked',
+          quoteProvider: 'okx-dex-swap',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-swap-quote-completed',
+      message: '已通过 OKX DEX Swap API 获取真实报价。',
+      resultData: {
+        swapGate: 'quote-ready',
+        quoteProvider: 'okx-dex-swap',
+        action: 'observe',
+        provider: 'okx-dex-swap',
+        source: 'okx-onchainos-api',
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-swap-quote-error',
+      fallbackMessage:
+        'OKX Swap 报价请求失败。H Wallet 不生成自有报价或路线。',
+      error,
+      resultData: {
+        swapGate: 'blocked',
+        quoteProvider: 'okx-dex-swap',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-dex-swap',
+      },
+    })
+  }
 }
 
 async function invokeSwapExecute(wrapper, input) {
@@ -471,6 +551,58 @@ function recordBlockedInvocation({ wrapper, input, code, message, resultData }) 
   }
 }
 
+function recordCompletedInvocation({
+  wrapper,
+  input,
+  code,
+  message,
+  resultData,
+}) {
+  const invocation = {
+    id: `h-skill-invocation-${Date.now()}`,
+    wrapperId: wrapper.id,
+    providerSkill: wrapper.providerSkill,
+    status: 'completed',
+    executionMode: 'read-only-adapter',
+    createdAt: new Date().toISOString(),
+    inputSummary: summarizeInput(input),
+    result: {
+      ok: true,
+      code,
+      message,
+      data: resultData,
+    },
+  }
+
+  return {
+    invocation: strategySkillRepository.insertHSkillInvocation(invocation),
+    wrapper,
+  }
+}
+
+function recordProviderErrorInvocation({
+  wrapper,
+  input,
+  code,
+  fallbackMessage,
+  error,
+  resultData,
+}) {
+  return recordBlockedInvocation({
+    wrapper,
+    input,
+    code,
+    message:
+      error instanceof Error && error.message
+        ? error.message
+        : fallbackMessage,
+    resultData: {
+      ...resultData,
+      providerError: getProviderErrorData(error),
+    },
+  })
+}
+
 function validateRiskScanInput(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return {
@@ -566,30 +698,41 @@ function validateSwapQuoteInput(input) {
   const chain = typeof input.chain === 'string' ? input.chain.trim() : ''
   const fromToken =
     typeof input.fromToken === 'string' ? input.fromToken.trim() : ''
+  const fromTokenAddress =
+    typeof input.fromTokenAddress === 'string'
+      ? input.fromTokenAddress.trim()
+      : ''
   const toToken = typeof input.toToken === 'string' ? input.toToken.trim() : ''
+  const toTokenAddress =
+    typeof input.toTokenAddress === 'string'
+      ? input.toTokenAddress.trim()
+      : ''
   const amount = typeof input.amount === 'string' ? input.amount.trim() : ''
 
-  if (!chain) {
+  const chainIndex =
+    typeof input.chainIndex === 'string' ? input.chainIndex.trim() : ''
+
+  if (!chain && !chainIndex) {
     return {
       ok: false,
       code: 'swap-quote-chain-required',
-      message: 'OKX Swap 报价需要 chain。',
+      message: 'OKX Swap 报价需要 chain 或 chainIndex。',
     }
   }
 
-  if (!fromToken) {
+  if (!fromToken && !fromTokenAddress) {
     return {
       ok: false,
       code: 'swap-quote-from-token-required',
-      message: 'OKX Swap 报价需要 fromToken。',
+      message: 'OKX Swap 报价需要 fromToken 或 fromTokenAddress。',
     }
   }
 
-  if (!toToken) {
+  if (!toToken && !toTokenAddress) {
     return {
       ok: false,
       code: 'swap-quote-to-token-required',
-      message: 'OKX Swap 报价需要 toToken。',
+      message: 'OKX Swap 报价需要 toToken 或 toTokenAddress。',
     }
   }
 
@@ -858,6 +1001,91 @@ function validateDefiClaimInput(input) {
   }
 
   return { ok: true }
+}
+
+function mapSwapQuoteInput(input) {
+  const fromTokenAddress = getTokenAddress(input, 'fromToken')
+  const toTokenAddress = getTokenAddress(input, 'toToken')
+
+  return {
+    amount: input.amount,
+    chain: input.chain,
+    chainIndex: input.chainIndex,
+    dexIds: input.dexIds,
+    directRoute: input.directRoute,
+    excludeDexIds: input.excludeDexIds,
+    excludePoolAddresses: input.excludePoolAddresses,
+    fromTokenAddress,
+    singlePoolPerHop: input.singlePoolPerHop,
+    singleRouteOnly: input.singleRouteOnly,
+    swapMode: input.swapMode,
+    toTokenAddress,
+  }
+}
+
+function mapGatewaySimulateInput(input) {
+  return {
+    chain: input.chain,
+    chainIndex: input.chainIndex,
+    data: input.data,
+    from: input.from,
+    fromAddress: input.fromAddress,
+    gasPrice: input.gasPrice,
+    inputData: input.inputData,
+    priorityFee: input.priorityFee,
+    to: input.to,
+    toAddress: input.toAddress,
+    txAmount: input.txAmount,
+    value: input.value,
+  }
+}
+
+function getTokenAddress(input, tokenField) {
+  const addressField =
+    tokenField === 'fromToken' ? 'fromTokenAddress' : 'toTokenAddress'
+  const directAddress = normalizeString(input[addressField])
+
+  if (directAddress) {
+    return directAddress
+  }
+
+  const token = normalizeString(input[tokenField])
+
+  if (isLikelyTokenAddress(token)) {
+    return token
+  }
+
+  const error = new Error(
+    `真实 OKX Swap Quote 需要 ${addressField}，不能只传 token symbol。`,
+  )
+  error.code = 'okx-token-address-required'
+  throw error
+}
+
+function isLikelyTokenAddress(input) {
+  if (!input) {
+    return false
+  }
+
+  return /^0x[a-fA-F0-9]{40}$/.test(input)
+}
+
+function normalizeString(input) {
+  return typeof input === 'string' && input.trim().length > 0
+    ? input.trim()
+    : ''
+}
+
+function getProviderErrorData(error) {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  return {
+    code: error.code ?? 'provider-error',
+    data: error.data,
+    statusCode: error.statusCode,
+  }
 }
 
 function validateText(input, fieldName) {

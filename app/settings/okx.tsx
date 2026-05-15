@@ -256,6 +256,16 @@ function ProviderRow({ provider }: { provider: OkxProviderAdapterStatus }) {
         <AppText variant="caption" color="textMuted">
           {provider.transport} · {provider.requiredEnv.join(' / ')}
         </AppText>
+        {provider.supportedMethods?.length ? (
+          <AppText variant="caption" color="success">
+            已接入：{provider.supportedMethods.join(' / ')}
+          </AppText>
+        ) : null}
+        {provider.limitation ? (
+          <AppText variant="caption" color="textMuted">
+            {provider.limitation}
+          </AppText>
+        ) : null}
         <AppText variant="caption" color="goldBright">
           {provider.credentialLabel}
         </AppText>
