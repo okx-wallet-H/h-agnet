@@ -21,6 +21,12 @@ import {
   useOfficialStrategySkills,
   useStartOfficialStrategy,
 } from '../../src/features/agent/hooks/useStrategySkills'
+import {
+  earningAgentExampleCommand,
+  earningAgentPrimaryCommand,
+  formatHSkillName,
+  formatOfficialStrategyName,
+} from '../../src/features/agent/model/earningAgentExperience'
 import { CardReviewActions } from '../../src/features/cards/components/CardReviewActions'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
 import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
@@ -29,9 +35,7 @@ import { isApiConfigured } from '../../src/services/api/httpClient'
 import type { AgentRunnerStatus } from '../../src/services/agent/types'
 
 export default function AgentScreen() {
-  const [command, setCommand] = useState(
-    '启动稳健稳定币赚币 Agent，先给我启动卡，不要执行。',
-  )
+  const [command, setCommand] = useState(earningAgentPrimaryCommand)
   const backendConfigured = isApiConfigured()
   const messages = useAgentConversationMessages()
   const sendMessage = useSendAgentConversationMessage()
@@ -137,13 +141,13 @@ export default function AgentScreen() {
           <Bot color={theme.colors.violet} size={22} />
         </View>
         <AppText color="textSecondary">
-          你可以说“启动稳健赚币 Agent”、“帮我分析资产”或“把 ETH 换成 USDC”。复杂过程会变成卡片。
+          {`你可以说“${earningAgentExampleCommand}”、“帮我分析资产”或“把 ETH 换成 USDC”。复杂过程会变成卡片。`}
         </AppText>
         <TextInput
           editable={backendConfigured}
           multiline
           onChangeText={setCommand}
-          placeholder="例如：启动稳健稳定币赚币 Agent"
+          placeholder={`例如：${earningAgentExampleCommand}`}
           placeholderTextColor={theme.colors.textMuted}
           style={styles.promptInput}
           value={command}
@@ -297,7 +301,9 @@ export default function AgentScreen() {
         {(skillRuntime.data?.hSkillBindings ?? []).slice(0, 2).map((binding) => (
           <View key={binding.hSkillWrapperId} style={styles.bindingRow}>
             <View style={styles.strategyCopy}>
-              <AppText variant="data">{formatHSkillLabel(binding.hSkillWrapperId)}</AppText>
+              <AppText variant="data">
+                {formatHSkillName(binding.hSkillWrapperId)}
+              </AppText>
               <AppText variant="caption" color="textMuted">
                 {binding.providerSkill} · {binding.reason}
               </AppText>
@@ -400,7 +406,7 @@ function AgentStatusCard({
                 当前策略
               </AppText>
               <AppText variant="data">
-                {formatStrategyId(currentRun.strategyId)}
+                {formatOfficialStrategyName(currentRun.strategyId)}
               </AppText>
             </View>
           </View>
@@ -434,7 +440,7 @@ function AgentStatusCard({
                 推荐操作
               </AppText>
               <AppText color="textSecondary">
-                先生成一张稳健赚币 Agent 启动卡，再进入授权中心确认。
+                {`先生成一张“${earningAgentExampleCommand}”启动卡，再进入授权中心确认。`}
               </AppText>
             </View>
           </View>
@@ -506,31 +512,6 @@ function getAgentStatusCopy({
   }
 
   return runnerStatus.summary
-}
-
-function formatStrategyId(strategyId: string) {
-  const labels: Record<string, string> = {
-    'official-stable-earn': '稳健稳定币赚币 Agent',
-    'official-smart-rebalance': '智能调仓赚币 Agent',
-  }
-
-  return labels[strategyId] ?? strategyId
-}
-
-function formatHSkillLabel(wrapperId: string) {
-  const labels: Record<string, string> = {
-    'H.skill.wallet.getPortfolio': '读取钱包资产',
-    'H.skill.swap.quote': '获取 Swap 报价',
-    'H.skill.swap.execute': '执行 OKX Swap',
-    'H.skill.risk.scanTransaction': '交易风险扫描',
-    'H.skill.gateway.simulate': '链上模拟',
-    'H.skill.gateway.broadcast': '链上广播',
-    'H.skill.gateway.trackOrder': '状态追踪',
-    'H.skill.defi.deposit': 'DeFi 存入',
-    'H.skill.defi.claim': '收益领取',
-  }
-
-  return labels[wrapperId] ?? wrapperId
 }
 
 function formatIntentLabel(intent: string) {

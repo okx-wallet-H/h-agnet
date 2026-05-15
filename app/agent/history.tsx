@@ -53,7 +53,7 @@ export default function AgentHistoryScreen() {
           </View>
           <AppText variant="section">暂无 Agent 运行记录</AppText>
           <AppText color="textSecondary">
-            启动赚币 Agent 草案后，运行状态会显示在这里。
+            生成 Agent 启动卡后，运行状态会显示在这里。
           </AppText>
         </TerminalCard>
       )}

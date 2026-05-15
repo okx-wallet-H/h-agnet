@@ -36,6 +36,10 @@ import {
   useSendAgentConversationMessage,
 } from '../../src/features/agent/hooks/useAgentConversation'
 import {
+  earningAgentExampleCommand,
+  earningAgentPrimaryCommand,
+} from '../../src/features/agent/model/earningAgentExperience'
+import {
   useBoostGrowthSummary,
   useSideQuests,
 } from '../../src/features/boost/hooks/useBoostGrowthSummary'
@@ -63,7 +67,7 @@ const guideCards: GuideCard[] = [
   {
     title: '帮我赚币',
     caption: '启动 Agent',
-    prompt: '启动稳健稳定币赚币 Agent，先给我启动卡，不要执行。',
+    prompt: earningAgentPrimaryCommand,
     icon: Gem,
   },
   {
@@ -139,7 +143,7 @@ export default function HomeScreen() {
               <View style={styles.heroCopy}>
                 <AppText variant="display">今天想做什么？</AppText>
                 <AppText color="textSecondary">
-                  像聊天一样说目标。H Wallet 会把充值、提现、交易和赚币整理成卡片；首次授权或新地址授权前不会执行资产动作。
+                  像聊天一样说目标。H Wallet 会先把 Agent 赚币、交易、充值提现整理成卡片；授权前不会执行资产动作。
                 </AppText>
               </View>
             </View>
@@ -175,7 +179,7 @@ export default function HomeScreen() {
                 onChangeText={setCommand}
                 placeholder={
                   backendConfigured
-                    ? '比如：帮我把 0.001 ETH 换成 USDC'
+                    ? `比如：${earningAgentExampleCommand}`
                     : '请先配置后端 API 地址'
                 }
                 placeholderTextColor={appTheme.colors.textMuted}

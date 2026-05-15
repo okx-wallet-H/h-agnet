@@ -113,7 +113,7 @@ Current module contracts:
   proposal state.
 
 AI conversation can start the official earning Agent flow. Phrases such as
-`启动稳健赚币 Agent` route to the official strategy registry and create a
+`启动稳健稳定币赚币 Agent` route to the official strategy registry and create a
 strategy launch card instead of a generic side-quest card. Side quests remain
 Card Library achievements, while the earning Agent remains the main onchain
 strategy execution surface.

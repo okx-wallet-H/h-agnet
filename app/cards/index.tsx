@@ -16,6 +16,7 @@ import { StatusPill } from '../../src/components/primitives/StatusPill'
 import { ScreenHeader } from '../../src/components/terminal/ScreenHeader'
 import { TerminalCard } from '../../src/components/terminal/TerminalCard'
 import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme'
+import { earningAgentExampleCommand } from '../../src/features/agent/model/earningAgentExperience'
 import { CardLibrarySummary } from '../../src/features/cards/components/CardLibrarySummary'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
 import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
@@ -318,7 +319,7 @@ function getGuidanceCopy(stats: CardLibraryStats) {
   }
 
   if (stats.totalCards === 0) {
-    return '回到 AI 对话，输入“启动稳健赚币 Agent”或“帮我分析资产”，卡库会开始积累数据。'
+    return `回到 AI 对话，输入“${earningAgentExampleCommand}”或“帮我分析资产”，卡库会开始积累数据。`
   }
 
   if (stats.receipts.total > 0 && stats.completion.verifiedResults === 0) {
