@@ -15,6 +15,7 @@ export type ConversationCardStatus =
   | 'agent-authorized'
   | 'requires-confirmation'
   | 'confirmed'
+  | 'pending-execution'
   | 'completed'
   | 'blocked'
   | 'archived'
@@ -75,6 +76,7 @@ export type CardLibraryStats = {
     draft: number
     pending: number
     confirmed: number
+    pendingExecution?: number
     blocked: number
   }
   receipts: {
@@ -94,6 +96,7 @@ export type CardLibraryStats = {
   completion: {
     completedCards: number
     confirmedCards: number
+    pendingExecutionCards?: number
     draftCards: number
     blockedCards: number
     verifiedResults: number

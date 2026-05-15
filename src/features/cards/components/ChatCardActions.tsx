@@ -52,6 +52,12 @@ const statusCopy: Record<
     status: '已授权',
     tone: 'purple',
   },
+  'pending-execution': {
+    title: '交易数据已准备',
+    body: 'OKX 已返回交易数据。当前仍需 Agent Wallet 签名、广播和链上回执验证，才会被收录为成功交易。',
+    status: '待执行',
+    tone: 'purple',
+  },
   completed: {
     title: '结果已进入卡库',
     body: '这张卡会用于任务评分、会员等级和后续组合建议。',
@@ -99,6 +105,7 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
 
     if (
       isAgentAuthorized ||
+      currentCard.status === 'pending-execution' ||
       currentCard.status === 'completed' ||
       currentCard.status === 'archived'
     ) {
@@ -183,6 +190,10 @@ function getPrimaryLabel(
   }
 
   if (status === 'agent-authorized') {
+    return '查看执行状态'
+  }
+
+  if (status === 'pending-execution') {
     return '查看执行状态'
   }
 

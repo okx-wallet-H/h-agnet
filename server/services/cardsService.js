@@ -23,6 +23,7 @@ const cardStatuses = new Set([
   'agent-authorized',
   'requires-confirmation',
   'confirmed',
+  'pending-execution',
   'completed',
   'blocked',
   'archived',
@@ -80,6 +81,7 @@ function getCardStatusMetric(status) {
     'agent-authorized': { value: 'Agent 已授权', tone: 'gold' },
     'requires-confirmation': { value: '待授权', tone: 'gold' },
     confirmed: { value: '已授权', tone: 'gold' },
+    'pending-execution': { value: '待执行', tone: 'gold' },
     completed: { value: '已完成', tone: 'success' },
     blocked: { value: '已阻止', tone: 'danger' },
     archived: { value: '已归档', tone: 'muted' },
@@ -310,6 +312,9 @@ function getCardLibraryStats() {
     (card) => card.status === 'requires-confirmation',
   )
   const confirmedCards = activeCards.filter((card) => card.status === 'confirmed')
+  const pendingExecutionCards = activeCards.filter(
+    (card) => card.status === 'pending-execution',
+  )
   const blockedCards = activeCards.filter((card) => card.status === 'blocked')
   const completedCards = activeCards.filter((card) => card.status === 'completed')
   const walletActionCards = activeCards.filter((card) =>
@@ -357,6 +362,9 @@ function getCardLibraryStats() {
       confirmed: confirmationCards.filter(
         (card) => card.status === 'confirmed',
       ).length,
+      pendingExecution: confirmationCards.filter(
+        (card) => card.status === 'pending-execution',
+      ).length,
       blocked: confirmationCards.filter(
         (card) => card.status === 'blocked',
       ).length,
@@ -380,6 +388,7 @@ function getCardLibraryStats() {
     completion: {
       completedCards: completedCards.length,
       confirmedCards: confirmedCards.length,
+      pendingExecutionCards: pendingExecutionCards.length,
       draftCards: draftCards.length,
       blockedCards: blockedCards.length,
       verifiedResults: verifiedResults.length,

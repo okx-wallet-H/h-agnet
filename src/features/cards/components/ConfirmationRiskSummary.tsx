@@ -81,6 +81,20 @@ function getRiskSummary(card: ConversationCard) {
     }
   }
 
+  if (card.status === 'pending-execution') {
+    return {
+      title: '交易数据已准备',
+      label: '待执行',
+      tone: 'gold' as RiskTone,
+      iconColor: '#F4D98B',
+      reasons: [
+        'OKX 已返回交易数据。',
+        '当前仍未完成签名、广播和链上回执。',
+        '卡库会记录过程，但不会把它当作真实成功。',
+      ],
+    }
+  }
+
   if (card.status === 'agent-authorized') {
     return {
       title: '已匹配授权范围',

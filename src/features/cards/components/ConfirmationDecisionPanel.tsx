@@ -65,7 +65,10 @@ export function ConfirmationDecisionPanel({
       return
     }
 
-    if (currentCard.status === 'confirmed') {
+    if (
+      currentCard.status === 'confirmed' ||
+      currentCard.status === 'pending-execution'
+    ) {
       router.push('/cards')
     }
   }
@@ -196,6 +199,15 @@ function getDecisionCopy(card: ConversationCard) {
     }
   }
 
+  if (card.status === 'pending-execution') {
+    return {
+      title: '等待执行回执',
+      body: 'OKX 已返回交易数据，但签名、广播和链上回执还没完成。卡库会把它当作过程卡，不会当作成功交易。',
+      statusLabel: '待执行',
+      tone: 'purple' as const,
+    }
+  }
+
   if (card.status === 'blocked') {
     return {
       title: '这张卡不能继续',
@@ -231,7 +243,7 @@ function getPrimaryLabel(card: ConversationCard, isPending: boolean) {
     return isPending ? '正在授权' : '我已授权'
   }
 
-  if (card.status === 'confirmed') {
+  if (card.status === 'confirmed' || card.status === 'pending-execution') {
     return '查看卡库'
   }
 

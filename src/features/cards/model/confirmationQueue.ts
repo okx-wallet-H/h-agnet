@@ -4,6 +4,7 @@ export const confirmationQueueStatuses = [
   'draft',
   'requires-confirmation',
   'confirmed',
+  'pending-execution',
   'blocked',
 ] as const
 
@@ -36,9 +37,10 @@ export function getCardStatusRank(status: ConversationCard['status']) {
     'agent-authorized': 2,
     'requires-confirmation': 3,
     confirmed: 4,
-    blocked: 5,
-    completed: 6,
-    archived: 7,
+    'pending-execution': 5,
+    blocked: 6,
+    completed: 7,
+    archived: 8,
   }
 
   return ranks[status]
@@ -79,6 +81,10 @@ export function getCardActionTitle(status: ConversationCard['status']) {
     return '已授权，等待执行层'
   }
 
+  if (status === 'pending-execution') {
+    return '交易数据已准备'
+  }
+
   if (status === 'blocked') {
     return '执行已阻止'
   }
@@ -103,6 +109,10 @@ export function getCardActionStatus(status: ConversationCard['status']) {
     return '已授权'
   }
 
+  if (status === 'pending-execution') {
+    return '待执行'
+  }
+
   if (status === 'blocked') {
     return '已阻止'
   }
@@ -125,6 +135,10 @@ export function getCardActionCopy(status: ConversationCard['status']) {
 
   if (status === 'confirmed') {
     return '用户授权已记录，但当前版本没有开放真实执行层。'
+  }
+
+  if (status === 'pending-execution') {
+    return 'OKX 已返回交易数据，卡片进入待执行状态；仍需签名、广播和回执验证后才算成功。'
   }
 
   if (status === 'blocked') {

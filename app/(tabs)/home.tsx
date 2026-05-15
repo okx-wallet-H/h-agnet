@@ -75,7 +75,7 @@ const guideCards: GuideCard[] = [
   {
     title: '准备交易',
     caption: '一次授权',
-    prompt: '帮我准备一笔小额交易，但先不要执行，只生成授权卡片。',
+    prompt: '帮我把 0.001 ETH 换成 USDC，先给我报价卡，不要执行。',
     icon: Zap,
   },
   {
@@ -175,7 +175,7 @@ export default function HomeScreen() {
                 onChangeText={setCommand}
                 placeholder={
                   backendConfigured
-                    ? '比如：帮我找一个适合新手的赚币任务'
+                    ? '比如：帮我把 0.001 ETH 换成 USDC'
                     : '请先配置后端 API 地址'
                 }
                 placeholderTextColor={appTheme.colors.textMuted}
