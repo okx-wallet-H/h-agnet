@@ -163,6 +163,26 @@ export function ConfirmationDecisionPanel({
 }
 
 function getDecisionCopy(card: ConversationCard) {
+  if (card.tags.includes('official-strategy')) {
+    if (card.status === 'draft') {
+      return {
+        title: '先生成启动授权卡',
+        body: '这一步只是把官方策略启动信息整理清楚，不会执行链上动作，也不会承诺收益。',
+        statusLabel: '策略草案',
+        tone: 'gold' as const,
+      }
+    }
+
+    if (card.status === 'requires-confirmation') {
+      return {
+        title: '授权启动这个 Agent',
+        body: '授权只覆盖当前官方策略版本。策略升级、风险阻止或执行异常时，H Wallet 会重新提示。',
+        statusLabel: '待授权',
+        tone: 'gold' as const,
+      }
+    }
+  }
+
   if (card.status === 'draft') {
     return {
       title: '先生成授权卡',

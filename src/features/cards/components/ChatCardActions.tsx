@@ -85,7 +85,7 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
   const currentCard = getDisplayCardSnapshot(card, updatedCard)
   const prepareCard = usePrepareConversationCardForConfirmation()
   const archiveCard = useArchiveConversationCard()
-  const copy = statusCopy[currentCard.status]
+  const copy = getStatusCopy(currentCard)
   const isDraft = currentCard.status === 'draft'
   const isAgentAuthorized = currentCard.status === 'agent-authorized'
   const isPreparing = prepareCard.isPending
@@ -175,6 +175,30 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
       ) : null}
     </TerminalCard>
   )
+}
+
+function getStatusCopy(card: ConversationCard) {
+  if (card.tags.includes('official-strategy')) {
+    if (card.status === 'draft') {
+      return {
+        title: '下一步：授权启动 Agent',
+        body: '这张卡只启动当前官方策略版本。授权前不会动用资产，真实结果必须以后端回执为准。',
+        status: '策略草案',
+        tone: 'gold' as const,
+      }
+    }
+
+    if (card.status === 'requires-confirmation') {
+      return {
+        title: '请确认是否启动',
+        body: '授权后 Agent 只能在这版官方策略范围内推进；策略升级、风险阻止或异常回执都会重新提示。',
+        status: '待授权',
+        tone: 'gold' as const,
+      }
+    }
+  }
+
+  return statusCopy[card.status]
 }
 
 function getPrimaryLabel(

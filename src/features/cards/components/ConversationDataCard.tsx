@@ -3,8 +3,10 @@ import {
   Archive,
   ArrowRight,
   ArrowRightLeft,
+  Bot,
   CheckCircle2,
   LockKeyhole,
+  Route,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react-native'
@@ -105,7 +107,7 @@ export function ConversationDataCard({ card }: ConversationDataCardProps) {
         <View style={styles.header}>
           <View style={styles.titleGroup}>
             <AppText variant="caption" color="goldBright">
-              {typeLabel[card.type]}
+              {getTypeLabel(card)}
             </AppText>
             <AppText variant="section">{card.title}</AppText>
             <AppText variant="caption" color="textMuted">
@@ -121,6 +123,14 @@ export function ConversationDataCard({ card }: ConversationDataCardProps) {
 
         {card.type === 'trade-confirmation' ? (
           <TradeExecutionSummary
+            appTheme={appTheme}
+            card={card}
+            styles={styles}
+          />
+        ) : null}
+
+        {isOfficialStrategyCard(card) ? (
+          <StrategyLaunchSummary
             appTheme={appTheme}
             card={card}
             styles={styles}
@@ -211,6 +221,140 @@ function getGateDescription(status: ConversationCardStatus) {
   }
 
   return '当前只是整理结果，不会自动执行任何动作。'
+}
+
+function StrategyLaunchSummary({
+  appTheme,
+  card,
+  styles,
+}: {
+  appTheme: AppTheme
+  card: ConversationCard
+  styles: ReturnType<typeof createStyles>
+}) {
+  const display = getStrategyDisplay(card)
+
+  return (
+    <View style={styles.strategyPanel}>
+      <View style={styles.strategyHeader}>
+        <View style={styles.strategyMark}>
+          <Bot color={appTheme.colors.goldBright} size={19} />
+        </View>
+        <View style={styles.strategyTitleCopy}>
+          <AppText variant="caption" color="goldBright">
+            官方 Agent 策略
+          </AppText>
+          <AppText variant="section">{display.name}</AppText>
+        </View>
+        <StatusPill label={display.riskLabel} tone={display.riskTone} />
+      </View>
+
+      <AppText color="textSecondary">{display.summary}</AppText>
+
+      <View style={styles.strategyScopeGrid}>
+        <StrategyScopeBlock
+          label="资产"
+          styles={styles}
+          value={display.assetsLabel}
+        />
+        <StrategyScopeBlock
+          label="网络"
+          styles={styles}
+          value={display.chainsLabel}
+        />
+      </View>
+
+      <View style={styles.strategyRoute}>
+        {display.steps.map((step, index) => (
+          <View key={step.label} style={styles.strategyRouteItem}>
+            <View
+              style={[
+                styles.strategyRouteIcon,
+                {
+                  borderColor: step.active
+                    ? appTheme.colors.goldBright
+                    : appTheme.colors.borderMuted,
+                },
+              ]}
+            >
+              {index === 0 ? (
+                <Bot
+                  color={
+                    step.active
+                      ? appTheme.colors.goldBright
+                      : appTheme.colors.textMuted
+                  }
+                  size={15}
+                />
+              ) : index === 1 ? (
+                <ShieldCheck
+                  color={
+                    step.active
+                      ? appTheme.colors.goldBright
+                      : appTheme.colors.textMuted
+                  }
+                  size={15}
+                />
+              ) : (
+                <Route
+                  color={
+                    step.active
+                      ? appTheme.colors.goldBright
+                      : appTheme.colors.textMuted
+                  }
+                  size={15}
+                />
+              )}
+            </View>
+            <View style={styles.strategyRouteCopy}>
+              <AppText variant="caption" color="textMuted">
+                {step.label}
+              </AppText>
+              <AppText variant="caption" style={{ color: step.color }}>
+                {step.value}
+              </AppText>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.strategySafetyBox}>
+        <View
+          style={[
+            styles.tradeStateDot,
+            { backgroundColor: appTheme.colors.goldBright },
+          ]}
+        />
+        <AppText color="textSecondary">{display.safetyCopy}</AppText>
+      </View>
+    </View>
+  )
+}
+
+function StrategyScopeBlock({
+  label,
+  styles,
+  value,
+}: {
+  label: string
+  styles: ReturnType<typeof createStyles>
+  value: string
+}) {
+  return (
+    <View style={styles.strategyScopeBlock}>
+      <AppText variant="caption" color="textMuted">
+        {label}
+      </AppText>
+      <AppText
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+        numberOfLines={1}
+        variant="data"
+      >
+        {value}
+      </AppText>
+    </View>
+  )
 }
 
 function TradeExecutionSummary({
@@ -352,6 +496,73 @@ function TradeMetaPill({
   )
 }
 
+function getStrategyDisplay(card: ConversationCard) {
+  const metadata = card.metadata ?? null
+  const blockedPlanCount = readNumber(metadata, 'blockedPlanCount')
+  const readyPlanCount = readNumber(metadata, 'readyPlanCount')
+  const totalPlanCount =
+    blockedPlanCount !== undefined && readyPlanCount !== undefined
+      ? blockedPlanCount + readyPlanCount
+      : readStringArray(metadata, 'requiredSkillWrappers').length
+  const authorized =
+    card.status === 'agent-authorized' ||
+    card.status === 'confirmed' ||
+    card.status === 'pending-execution' ||
+    card.status === 'completed'
+  const readySkillsText =
+    totalPlanCount > 0
+      ? `${readyPlanCount ?? 0}/${totalPlanCount} 就绪`
+      : getMetricValue(card, 'H Skill', '等待检查')
+
+  return {
+    assetsLabel:
+      readStringArray(metadata, 'supportedAssets').join(' / ') ||
+      getMetricValue(card, '资产范围', '官方支持资产'),
+    chainsLabel:
+      readStringArray(metadata, 'supportedChains').join(' / ') ||
+      getMetricValue(card, '网络范围', '官方支持网络'),
+    name: readString(metadata, 'strategyName') ?? card.title,
+    riskLabel: getMetricValue(card, '风险等级', '策略风险'),
+    riskTone: getMetricValue(card, '风险等级', '').includes('低')
+      ? ('success' as const)
+      : ('gold' as const),
+    safetyCopy:
+      card.status === 'agent-authorized'
+        ? '授权只覆盖当前官方策略版本。策略升级、风险阻止或执行回执异常时，Agent 会停下来重新提示。'
+        : '这张卡只是启动策略的授权入口。授权前不会动用资产，也不会承诺收益。',
+    steps: [
+      {
+        active: true,
+        color: '#F4D98B',
+        label: '启动卡',
+        value: '已生成',
+      },
+      {
+        active: authorized,
+        color: authorized ? '#F4D98B' : '#736A83',
+        label: '策略授权',
+        value: authorized ? '已匹配' : '待确认',
+      },
+      {
+        active: readyPlanCount !== undefined && readyPlanCount > 0,
+        color:
+          blockedPlanCount === 0 && totalPlanCount > 0 ? '#18C47C' : '#736A83',
+        label: 'H Skill',
+        value: readySkillsText,
+      },
+      {
+        active: card.status === 'completed',
+        color: card.status === 'completed' ? '#18C47C' : '#736A83',
+        label: '结果',
+        value: card.status === 'completed' ? '已入库' : '等回执',
+      },
+    ],
+    summary:
+      readString(metadata, 'strategySummary') ??
+      '官方策略会按版本授权，并通过 H Skill Wrapper 调用 OKX OnchainOS 能力。',
+  }
+}
+
 function getTradeDisplay(card: ConversationCard) {
   const pipeline = getPipelineMetadata(card)
   const intent = getPipelineIntent(pipeline)
@@ -422,6 +633,18 @@ function getTradeDisplay(card: ConversationCard) {
   }
 }
 
+function getTypeLabel(card: ConversationCard) {
+  if (isOfficialStrategyCard(card)) {
+    return 'Agent 启动'
+  }
+
+  return typeLabel[card.type]
+}
+
+function isOfficialStrategyCard(card: ConversationCard) {
+  return card.tags.includes('official-strategy')
+}
+
 function getPipelineMetadata(card: ConversationCard) {
   const pipeline = card.metadata?.pipeline
 
@@ -451,6 +674,28 @@ function readString(
   return typeof value === 'string' && value.trim().length > 0
     ? value
     : undefined
+}
+
+function readNumber(
+  source: Record<string, unknown> | null,
+  key: string,
+): number | undefined {
+  const value = source?.[key]
+
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined
+}
+
+function readStringArray(
+  source: Record<string, unknown> | null,
+  key: string,
+): string[] {
+  const value = source?.[key]
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -551,6 +796,14 @@ function formatTag(tag: string) {
     receipt: '回执',
     execution: '执行',
     'not-broadcast': '未广播',
+    agent: 'Agent',
+    'earning-agent': '赚币 Agent',
+    'official-strategy': '官方策略',
+    'strategy-skill': 'H Skill',
+    quote: '报价',
+    'okx-dex': 'OKX DEX',
+    'swap-data': '交易数据',
+    simulation: '模拟',
   }
 
   return labels[tag] ?? tag
@@ -591,6 +844,93 @@ function createStyles(appTheme: AppTheme) {
       appTheme.mode === 'dark'
         ? 'rgba(216, 180, 95, 0.08)'
         : 'rgba(124, 58, 237, 0.08)',
+  },
+  strategyPanel: {
+    gap: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: appTheme.colors.border,
+    borderRadius: theme.radius.lg,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(216, 180, 95, 0.065)'
+        : 'rgba(216, 180, 95, 0.12)',
+    padding: theme.spacing.md,
+  },
+  strategyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  strategyMark: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: appTheme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(124, 58, 237, 0.12)'
+        : 'rgba(124, 58, 237, 0.08)',
+  },
+  strategyTitleCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  strategyScopeGrid: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  strategyScopeBlock: {
+    minWidth: 0,
+    flex: 1,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: appTheme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(5, 4, 10, 0.3)'
+        : 'rgba(255, 255, 255, 0.62)',
+    padding: theme.spacing.md,
+  },
+  strategyRoute: {
+    gap: theme.spacing.sm,
+  },
+  strategyRouteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  strategyRouteIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: theme.radius.md,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(247, 242, 232, 0.025)'
+        : 'rgba(255, 255, 255, 0.58)',
+  },
+  strategyRouteCopy: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  strategySafetyBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: appTheme.colors.borderMuted,
+    paddingTop: theme.spacing.md,
   },
   tradePanel: {
     gap: theme.spacing.md,

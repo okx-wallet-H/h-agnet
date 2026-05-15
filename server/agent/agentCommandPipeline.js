@@ -92,15 +92,14 @@ function applyAuthorizationToCards(cards, authorization) {
     })
     upsertMetric(card, {
       label: '下一步',
-      value: '等待 OKX 适配器',
+      value: card.tags.includes('official-strategy')
+        ? '等待 H Skill Runner'
+        : '等待 OKX 适配器',
       tone: 'gold',
     })
     upsertMetric(card, {
       label: '授权范围',
-      value:
-        authorization.scope === 'trusted-withdrawal-address'
-          ? '当前地址'
-          : '交易自主执行',
+      value: getAuthorizationScopeLabel(authorization.scope),
       tone: 'gold',
     })
   })
@@ -115,7 +114,27 @@ function getAuthorizedSummary(card) {
     return '该地址已完成授权，本次钱包动作可进入 Agent 自主执行通道。地址变化时仍会重新要求授权。'
   }
 
+  if (card.tags.includes('official-strategy')) {
+    return '这个官方赚币策略已匹配你的授权范围。Agent 只能在当前策略版本内继续推进，策略变化时会重新授权。'
+  }
+
   return card.summary
+}
+
+function getAuthorizationScopeLabel(scope) {
+  if (scope === 'trusted-withdrawal-address') {
+    return '当前地址'
+  }
+
+  if (scope === 'trade-autonomy') {
+    return '交易自主执行'
+  }
+
+  if (typeof scope === 'string' && scope.startsWith('strategy:')) {
+    return '官方策略版本'
+  }
+
+  return '当前授权'
 }
 
 function upsertMetric(card, nextMetric) {

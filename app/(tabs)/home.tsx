@@ -63,7 +63,7 @@ const guideCards: GuideCard[] = [
   {
     title: '帮我赚币',
     caption: '启动 Agent',
-    prompt: '启动稳健赚币 Agent，先生成授权卡。',
+    prompt: '启动稳健稳定币赚币 Agent，先给我启动卡，不要执行。',
     icon: Gem,
   },
   {

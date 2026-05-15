@@ -318,7 +318,7 @@ function getGuidanceCopy(stats: CardLibraryStats) {
   }
 
   if (stats.totalCards === 0) {
-    return '回到 AI 对话，输入“帮我找一个赚币任务”或“帮我分析资产”，卡库会开始积累数据。'
+    return '回到 AI 对话，输入“启动稳健赚币 Agent”或“帮我分析资产”，卡库会开始积累数据。'
   }
 
   if (stats.receipts.total > 0 && stats.completion.verifiedResults === 0) {

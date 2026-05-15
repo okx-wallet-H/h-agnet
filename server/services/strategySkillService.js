@@ -122,17 +122,25 @@ function startOfficialStrategySkill(input) {
     requiresAssetAction: true,
     scope: strategy.authorizationScope,
   })
+  const blockedPlanCount = executionPlan.filter(
+    (item) => item.status === 'blocked',
+  ).length
+  const runStatus = authorization.requiredUserAuthorization
+    ? 'waiting-authorization'
+    : blockedPlanCount > 0
+      ? 'blocked'
+      : 'planning'
   const run = {
     id: `agent-run-${Date.now()}`,
     strategyId: strategy.id,
     strategyVersion: strategy.version,
-    status: 'blocked',
+    status: runStatus,
     createdAt: new Date().toISOString(),
     executionMode: 'draft-only',
     requiredSkillWrappers: strategy.requiredSkillWrappers,
     executionPlan,
     authorization,
-    stateLabel: '已阻止',
+    stateLabel: getRunStateLabel(runStatus),
     blockReason: getRunBlockReason({ authorization, executionPlan }),
     nextStep: getNextPlanStep(executionPlan),
     steps: [
@@ -171,34 +179,53 @@ function startOfficialStrategySkill(input) {
 
   const card = createCard({
     type: 'system-status',
-    status: 'draft',
+    status: authorization.requiredUserAuthorization ? 'draft' : 'agent-authorized',
     source: 'ai-agent',
     title: `${strategy.name} 启动草案`,
     summary:
-      'H Wallet 已创建官方赚币策略启动草案。当前阶段不会执行真实链上操作，也不会承诺收益。',
+      'H Wallet 已创建官方赚币 Agent 启动卡。授权前不会动用资产；当前阶段只进入策略草案和 H Skill 编排。',
     metrics: [
       { label: '策略版本', value: strategy.version, tone: 'gold' },
       { label: '风险等级', value: formatRiskLevel(strategy.riskLevel), tone: 'gold' },
       { label: '要做的事', value: '启动赚币 Agent', tone: 'gold' },
-      { label: '执行模式', value: '草案，不执行', tone: 'danger' },
-      { label: '所需 H Skill', value: String(strategy.requiredSkillWrappers.length), tone: 'muted' },
       {
-        label: '授权范围',
-        value: strategy.authorizationScope,
+        label: '资产范围',
+        value: strategy.supportedAssets.join(' / '),
+        tone: 'gold',
+      },
+      {
+        label: '网络范围',
+        value: strategy.supportedChains.join(' / '),
         tone: 'muted',
+      },
+      {
+        label: 'H Skill',
+        value: `${strategy.requiredSkillWrappers.length} 个封装能力`,
+        tone: blockedPlanCount > 0 ? 'muted' : 'gold',
       },
       {
         label: '当前状态',
         value: authorization.requiredUserAuthorization ? '未授权' : 'Agent 已授权',
         tone: authorization.requiredUserAuthorization ? 'danger' : 'gold',
       },
+      {
+        label: '下一步',
+        value: authorization.requiredUserAuthorization ? '完成策略授权' : '等待执行回执',
+        tone: 'gold',
+      },
     ],
     metadata: {
       authorizationScope: strategy.authorizationScope,
       authorizationStatus: authorization.authorizationStatus,
+      blockedPlanCount,
+      readyPlanCount: executionPlan.length - blockedPlanCount,
       strategyId: strategy.id,
+      strategyName: strategy.name,
+      strategySummary: strategy.summary,
       strategyVersion: strategy.version,
       runId: run.id,
+      supportedAssets: strategy.supportedAssets,
+      supportedChains: strategy.supportedChains,
       requiredSkillWrappers: strategy.requiredSkillWrappers,
     },
     tags: [
@@ -216,6 +243,17 @@ function startOfficialStrategySkill(input) {
     strategy,
     card,
   }
+}
+
+function getRunStateLabel(status) {
+  const labels = {
+    blocked: '已阻止',
+    idle: '待启动',
+    planning: '规划中',
+    'waiting-authorization': '等待授权',
+  }
+
+  return labels[status] ?? status
 }
 
 function buildStrategyExecutionPlan(strategy) {

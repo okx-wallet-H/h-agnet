@@ -175,7 +175,7 @@ function createEarningAgentCommand({ content, startOfficialStrategy }) {
       scope: result.strategy.authorizationScope,
     },
     assistantText:
-      '我已经帮你创建赚币 Agent 启动草案。先完成 Agent Wallet 登录和策略授权，后续执行会通过 H Skill 调用 OKX OnchainOS 能力。',
+      `我已经把「${result.strategy.name}」启动卡准备好了。你先看卡片：授权前不会动用资产；后续只会通过 H Skill 调用 OKX OnchainOS 能力。`,
     cards: [result.card],
     requiredConfirmation: true,
   }

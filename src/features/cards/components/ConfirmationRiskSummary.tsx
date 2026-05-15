@@ -123,6 +123,20 @@ function getRiskSummary(card: ConversationCard) {
     }
   }
 
+  if (isOfficialStrategyCard(card)) {
+    return {
+      title: '启动 Agent 前请授权',
+      label: card.status === 'requires-confirmation' ? '待授权' : '草案',
+      tone: 'gold' as RiskTone,
+      iconColor: '#F4D98B',
+      reasons: [
+        '授权只适用于当前官方策略版本。',
+        'Agent 会通过 H Skill 调用 OKX OnchainOS 能力。',
+        '真实收益和成功结果必须以后端验证回执为准。',
+      ],
+    }
+  }
+
   return {
     title: `${actionLabel}前请授权`,
     label: card.status === 'requires-confirmation' ? '待授权' : '草案',
@@ -134,6 +148,10 @@ function getRiskSummary(card: ConversationCard) {
       '看不懂可以取消，让 H Wallet 重新整理。',
     ],
   }
+}
+
+function isOfficialStrategyCard(card: ConversationCard) {
+  return card.tags.includes('official-strategy')
 }
 
 function getActionLabel(card: ConversationCard) {
