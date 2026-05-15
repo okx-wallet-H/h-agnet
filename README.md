@@ -1,73 +1,155 @@
-# React + TypeScript + Vite
+# H Wallet
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+H Wallet is a mobile-first AI conversational Web3 community app, Agent Wallet,
+and onchain earning Agent product for the OKX ecosystem and OnchainOS workflows.
 
-Currently, two official plugins are available:
+Users interact through AI conversation. Registration, recharge, withdrawal,
+trade preparation, portfolio review, rewards, and side quests are represented as
+reviewable cards. Successful or verified cards enter the Card Library, which
+powers user statistics, portfolio suggestions, membership scoring, and growth
+systems.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The Agent Wallet flow is passwordless: users register with email OTP through
+OKX Agent Wallet, then start an earning Agent. The Agent executes product-owned
+preset onchain strategies through backend OnchainOS skill adapters, while the
+user sees simple Chinese progress cards, authorization cards, and result cards.
 
-## React Compiler
+Strategies are dynamic backend-managed assets. H Wallet wraps OKX OnchainOS
+skills behind its own H skill contracts, so strategies can be versioned,
+updated, enabled, disabled, or replaced without coupling screens to provider
+commands.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The first trade authorization grants Agent execution within that policy scope;
+withdrawal or transfer address changes require a fresh user authorization.
 
-## Expanding the ESLint configuration
+This project is in the first rebuild phase. The current focus is architecture,
+navigation, design system, module API boundaries, and safe backend contracts.
+Real wallet, OKX, OnchainOS, and OKX Swap execution integrations are
+intentionally not implemented yet.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Trading is not a self-built matching, routing, or swap engine. H Wallet only
+orchestrates AI intent, authorization, card UX, and backend adapter boundaries.
+Quotes, routing, swap data, and swap status must come from OKX Swap /
+OnchainOS APIs.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Current product scope is OKX Onchain only: OKX Wallet, Agent Wallet, OnchainOS,
+DEX Swap, bridge, token/security, and wallet portfolio. OKX CEX exchange
+accounts, exchange balances, exchange orders, bots, and Earn products are a
+separate future domain and must not be mixed into Agent Wallet or OnchainOS
+flows.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+* Expo
+* React Native
+* TypeScript
+* Expo Router
+* NativeWind
+* Zustand
+* React Query
+* Reanimated
+* MMKV
+
+## Run
+
+```bash
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Then open the app in Expo Go, iOS Simulator, Android Emulator, or web:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm run ios
+npm run android
+npm run web
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Backend
+
+Start the local H Wallet backend contract server:
+
+```bash
+npm run backend
+```
+
+The first-phase backend listens on `http://127.0.0.1:3000`. All product API
+routes use the H Wallet namespace prefix: `/api/h/v1`.
+
+* `GET /`
+* `GET /api/h/v1/auth/agent-wallet/status`
+* `GET /api/h/v1/auth/me`
+* `POST /api/h/v1/auth/agent-wallet/request-otp`
+* `POST /api/h/v1/auth/agent-wallet/verify`
+* `GET /api/h/v1/auth/agent-wallet/session`
+* `GET /api/h/v1/wallet/account`
+* `GET /api/h/v1/wallet/assets`
+* `GET /api/h/v1/wallet/chains`
+* `GET /api/h/v1/agent/strategies`
+* `GET /api/h/v1/agent/skill-wrappers`
+* `GET /api/h/v1/agent/skill-runtime`
+* `GET /api/h/v1/agent/skill-runtime/invocations`
+* `POST /api/h/v1/agent/skill-runtime/dry-run`
+* `POST /api/h/v1/agent/skill-runtime/invoke`
+* `GET /api/h/v1/agent/runner`
+* `GET /api/h/v1/agent/runs`
+* `POST /api/h/v1/agent/strategies/:id/start`
+* `GET /api/h/v1/cards`
+* `GET /api/h/v1/cards/stats`
+* `POST /api/h/v1/cards`
+* `POST /api/h/v1/cards/:id/prepare-confirmation`
+* `POST /api/h/v1/cards/:id/confirm` records user authorization and returns a
+  non-broadcast execution receipt card
+* `POST /api/h/v1/cards/:id/archive`
+* `GET /api/h/v1/boost/campaigns`
+* `GET /api/h/v1/boost/growth-summary`
+* `GET /api/h/v1/boost/side-quests`
+* `GET /api/h/v1/boost/side-quest-rules`
+* `GET /api/h/v1/boost/scoring-rules`
+* `GET /api/h/v1/admin/boost/side-quest-rules`
+* `POST /api/h/v1/admin/boost/side-quest-rules/draft`
+* `POST /api/h/v1/admin/boost/side-quest-rules/preview`
+* `POST /api/h/v1/admin/boost/side-quest-rules/publish`
+* `POST /api/h/v1/admin/boost/side-quest-rules/discard-draft`
+* `GET /api/h/v1/admin/boost/scoring-rules`
+* `POST /api/h/v1/admin/boost/scoring-rules/draft`
+* `POST /api/h/v1/admin/boost/scoring-rules/preview`
+* `POST /api/h/v1/admin/boost/scoring-rules/publish`
+* `POST /api/h/v1/admin/boost/scoring-rules/discard-draft`
+* `GET /api/h/v1/admin/audit-logs`
+* `GET /api/h/v1/trading/proposals/pending`
+* `POST /api/h/v1/trading/proposals`
+* `POST /api/h/v1/risk/trade-proposal`
+* `GET /api/h/v1/ai/conversation/turns`
+* `GET /api/h/v1/ai/conversation/messages`
+* `GET /api/h/v1/ai/authorization-policy`
+* `POST /api/h/v1/ai/conversation/messages`
+* `GET /api/h/v1/ai/strategy/proposals/pending`
+* `POST /api/h/v1/ai/strategy/proposals`
+
+Copy `.env.example` when configuring local environments. Do not commit `.env`
+or any OKX / OnchainOS credentials.
+
+Admin routes require `H_WALLET_ADMIN_TOKEN` on the backend and
+`Authorization: Bearer <token>` from the management backend only. Mobile
+frontend code must not use admin tokens or mutate reward and side quest rules.
+
+Current persistence is intentionally in-memory behind repository boundaries.
+The first database target is PostgreSQL; replacing the in-memory repositories
+should not require frontend or screen changes.
+See `docs/architecture/database-schema.md` and
+`docs/database/001_initial_schema.sql` for the first database blueprint.
+
+When the backend is configured with `H_AGENT_ONCHAINOS_AUTH_MODE=cli` and
+`ONCHAINOS_CLI_PATH`, the Agent Wallet auth endpoints call:
+
+* `onchainos wallet login <email> --locale zh-CN`
+* `onchainos wallet verify <otp>`
+* `onchainos wallet status`
+* `onchainos wallet balance`
+
+## Verify
+
+```bash
+npm run typecheck
+npm run lint
 ```

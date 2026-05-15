@@ -1,0 +1,166 @@
+# Strategy Skill Runtime
+
+This is the current product memory for H Wallet's earning Agent architecture.
+
+## Current Scope
+
+H Wallet is an onchain earning Agent product.
+
+The current phase supports official strategy skills only:
+
+```txt
+Agent Wallet
+→ Agent Runner
+→ Official Strategy Skill Registry
+→ H Skill Wrapper
+→ OKX OnchainOS skill / MCP / CLI / API
+→ normalized result
+→ card
+→ Card Library
+```
+
+## Strategy Skill Principle
+
+Strategies are dynamic product assets, not frontend logic.
+
+The frontend can list, start, pause, and review strategies, but it must not
+contain strategy execution logic, token routing rules, yield assumptions, or
+provider-specific commands.
+
+Runner plan inspection uses:
+
+```txt
+GET /api/h/v1/agent/strategies/:strategyId/plan
+```
+
+This endpoint returns the ordered H Skill execution plan for an official
+strategy. The plan is informational in the current phase: it marks protocol
+steps as ready or blocked, but it does not execute provider actions.
+
+Provider readiness is centralized in the OKX provider registry:
+
+```txt
+H Skill Wrapper
+→ provider skill id
+→ OKX provider registry
+→ server-only adapter status
+```
+
+The registry currently tracks `okx-agentic-wallet`, `okx-dex-swap`,
+`okx-security`, `okx-onchain-gateway`, and `okx-defi-invest`. Screens may show
+registry status, but they must not branch into provider commands or hold
+provider secrets.
+
+OKX Project/API credentials are marked as the `H Wallet 官方接入` server
+channel. This means provider calls are made through H Wallet's official backend
+credential boundary, while user asset authorization remains controlled by the
+Agent Wallet authorization policy. The official channel marker should flow into
+plans, audit events, and cards as source context, not as a substitute for user
+authorization.
+
+Every strategy skill declares:
+
+* `id`
+* `version`
+* Chinese display name and summary
+* risk level
+* supported chains and assets
+* required H Skill wrappers
+* authorization scope
+* stop conditions
+* card templates
+
+Strategy authorization is scoped by strategy version, for example
+`strategy:stable-earn:v0`. The first user confirmation creates a grant for that
+exact scope. A different strategy or strategy version must be treated as a new
+authorization scope unless the backend policy deliberately migrates it.
+
+## H Skill Wrapper Principle
+
+The Agent calls H Skill wrappers, not raw provider skills.
+
+```txt
+H.skill.swap.quote
+→ provider adapter
+→ okx-dex-swap
+→ normalized quote result
+```
+
+This keeps the Agent Runner stable when strategies change or when provider
+integrations are replaced.
+
+The first runtime contract is dry-run only:
+
+```txt
+GET  /api/h/v1/agent/skill-runtime
+GET  /api/h/v1/agent/skill-runtime/invocations
+POST /api/h/v1/agent/skill-runtime/dry-run
+POST /api/h/v1/agent/skill-runtime/invoke
+```
+
+Dry-run validates wrapper identity, records an invocation, and returns a blocked
+result. It does not call OKX, OnchainOS, wallets, or provider APIs.
+
+The first read-only invoke target is `H.skill.wallet.getPortfolio`. It maps to
+`okx-agentic-wallet` / `onchainos wallet balance` because it reads the current
+logged-in Agent Wallet. Address-based portfolio lookup is a different wrapper
+and should use `okx-wallet-portfolio` when introduced.
+
+The first risk-gate invoke target is `H.skill.risk.scanTransaction`. It maps to
+`okx-security` / `onchainos security tx-scan`. Until the real adapter is
+connected, the wrapper must return a blocked fail-safe result. A missing or
+failed risk scan is never treated as safe.
+
+The first simulation-gate invoke target is `H.skill.gateway.simulate`. It maps
+to `okx-onchain-gateway` / `onchainos gateway simulate`. Until the real adapter
+is connected, the wrapper must return a blocked fail-safe result. A missing or
+failed simulation is never treated as executable.
+
+Trading is owned by OKX. `H.skill.swap.quote` maps to `okx-dex-swap` quote
+capability. H Wallet must not create its own quote, route, swap calldata, or
+execution engine. Until the OKX swap adapter is connected, quote requests return
+a blocked result instead of fake pricing.
+
+`H.skill.swap.execute` also maps to `okx-dex-swap`. OKX owns approve, signing,
+broadcast, tx hash, and execution response. H Wallet only supplies validated
+intent, wallet, authorization scope, and card/audit context. Until the adapter
+is connected, execute requests return a blocked result.
+
+`H.skill.gateway.broadcast` and `H.skill.gateway.trackOrder` map to
+`okx-onchain-gateway`. They are for non-swap final-mile transaction broadcast
+and status tracking. Broadcast requires an authorization scope and must remain
+blocked until the adapter is connected. Tracking must never invent transaction
+state.
+
+`H.skill.defi.deposit` and `H.skill.defi.claim` map to `okx-defi-invest`.
+They are the only current H Skill wrappers for DeFi earning actions. H Wallet
+must not choose yield products in the frontend, invent APY, build DeFi calldata,
+or claim rewards without OKX verified data. Deposit requires a backend-selected
+`investmentId`, wallet address, amount, token, and authorization scope. Claim
+requires a fresh position-detail reference before any collection attempt, so
+stale Card Library or cached portfolio data cannot trigger a reward claim.
+Until the adapter is connected, both wrappers return blocked fail-safe results.
+
+## Agent Runner State Machine
+
+The Runner owns execution state. Strategy skills do not own global lifecycle.
+
+```txt
+idle
+→ starting
+→ planning
+→ waiting-authorization
+→ executing
+→ completed
+```
+
+Any state can move to:
+
+```txt
+blocked
+paused
+```
+
+Current implementation exposes the state machine contract and creates blocked
+draft runs. Real execution stays disabled until H Skill wrappers, authorization,
+risk checks, and verified result cards are connected.

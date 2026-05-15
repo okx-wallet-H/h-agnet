@@ -1,7 +1,25 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "ignoreDeprecations": "5.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "types": [
+      "nativewind/types",
+      "node"
+    ]
+  },
+  "include": [
+    "app",
+    "src",
+    "assets",
+    "nativewind-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
   ]
 }
