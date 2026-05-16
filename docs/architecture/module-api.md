@@ -312,6 +312,18 @@ checks OKX DEX History through `H.skill.gateway.trackOrder`. H Wallet only
 creates a `trade-success` card when OKX reports `success`. `pending`, `fail`,
 missing records, provider errors, or unknown states do not create success cards.
 
+Run the local in-memory smoke check after changing Card Library, confirmation
+continuation, or trade-result verification logic:
+
+```txt
+node scripts/smoke-card-logic.js
+```
+
+The smoke check does not read `.env`, does not start PostgreSQL, and does not
+call OKX. It verifies that quote-ready confirmations and blocked follow-up cards
+stay in conversation history only, while `pending-execution` and verified
+`trade-success` cards are the only records admitted into the Card Library.
+
 Growth scoring v1 is exposed by `/boost/growth-summary`. It returns a
 transparent score, tier, task score, trust score, per-rule breakdown, recommended
 next actions, and safety caveats. It must stay derived from Card Library data
