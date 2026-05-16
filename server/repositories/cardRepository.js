@@ -1,4 +1,5 @@
 const cards = []
+const { persistCard } = require('../database/persistence')
 
 function createCardRepository() {
   return {
@@ -10,6 +11,7 @@ function createCardRepository() {
     },
     insert(card) {
       cards.unshift(card)
+      persistCard(card)
 
       return card
     },
@@ -19,6 +21,12 @@ function createCardRepository() {
       }
 
       return cards.filter((card) => card.userId === userId)
+    },
+    hydrate(nextCards = []) {
+      cards.splice(0, cards.length, ...nextCards)
+    },
+    persist(card) {
+      persistCard(card)
     },
   }
 }

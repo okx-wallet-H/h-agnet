@@ -4,6 +4,10 @@ const { loadServerEnv } = require('./config/loadServerEnv')
 loadServerEnv()
 
 const {
+  bootstrapPersistence,
+  getPersistenceStatus,
+} = require('./database/bootstrapPersistence')
+const {
   getAgentWalletSession,
   getAuthStatus,
   getCurrentIdentity,
@@ -101,6 +105,7 @@ async function handleRequest(request, response) {
         ok: true,
         service: 'h-wallet-backend',
         apiPrefix,
+        persistence: getPersistenceStatus(),
         status: getAuthStatus(),
       })
       return
@@ -738,9 +743,26 @@ const server = http.createServer((request, response) => {
   void handleRequest(request, response)
 })
 
-server.listen(port, host, () => {
-  console.log(`H Wallet backend listening on http://${host}:${port}${apiPrefix}`)
-})
+void startServer()
+
+async function startServer() {
+  try {
+    const persistenceStatus = await bootstrapPersistence()
+
+    server.listen(port, host, () => {
+      console.log(
+        `H Wallet backend listening on http://${host}:${port}${apiPrefix}`,
+      )
+      console.log(`H Wallet persistence mode: ${persistenceStatus.mode}`)
+    })
+  } catch (error) {
+    console.error(
+      'H Wallet backend failed to initialize persistence:',
+      error instanceof Error ? error.message : error,
+    )
+    process.exitCode = 1
+  }
+}
 
 function getRoutePath(pathname) {
   if (pathname.startsWith(`${apiPrefix}/`)) {

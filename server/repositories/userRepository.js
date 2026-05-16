@@ -1,5 +1,9 @@
 const users = []
 let currentUserId = null
+const {
+  persistCurrentUserId,
+  persistUser,
+} = require('../database/persistence')
 
 function createUserRepository() {
   return {
@@ -17,8 +21,13 @@ function createUserRepository() {
     list() {
       return users
     },
+    hydrate(nextUsers = [], nextCurrentUserId = null) {
+      users.splice(0, users.length, ...nextUsers)
+      currentUserId = nextCurrentUserId
+    },
     setCurrentUserId(userId) {
       currentUserId = userId
+      persistCurrentUserId(userId)
     },
     upsertByEmail(email, patch = {}) {
       const existingUser = users.find((user) => user.email === email)
@@ -26,6 +35,7 @@ function createUserRepository() {
 
       if (existingUser) {
         Object.assign(existingUser, patch, { updatedAt: now })
+        persistUser(existingUser)
 
         return existingUser
       }
@@ -40,6 +50,7 @@ function createUserRepository() {
       }
 
       users.unshift(user)
+      persistUser(user)
 
       return user
     },

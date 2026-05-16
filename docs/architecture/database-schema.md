@@ -6,13 +6,13 @@ depend on database details.
 
 ## Persistence Strategy
 
-Current state:
+Fallback state:
 
 ```txt
 service -> repository -> in-memory store
 ```
 
-Target state:
+Enabled state:
 
 ```txt
 service -> repository -> PostgreSQL adapter
@@ -21,6 +21,9 @@ service -> repository -> PostgreSQL adapter
 Repository names should stay stable while implementations change:
 
 * `cardRepository`
+* `agentWalletRepository`
+* `agentAuthorizationPolicyRepository`
+* `strategySkillRepository`
 * `sideQuestRuleRepository`
 * `scoringRuleRepository`
 * `adminAuditLogRepository`
@@ -64,6 +67,24 @@ observation model, not a final reward formula.
 Stores user-level Agent autonomy grants. Trade autonomy can be granted once per
 user, while withdrawal and transfer autonomy is address-scoped. Address changes
 must create a new authorization requirement.
+
+### strategy_runs
+
+Stores Agent Runner state for official strategy runs, including authorization
+state, execution plan, H Skill composition, blocked adapter reason, and current
+timeline.
+
+### h_skill_invocations
+
+Stores H Skill wrapper invocation records. These are provider-boundary audit
+records and must not imply successful on-chain execution unless the invocation
+contains a verified provider result.
+
+### h_runtime_state
+
+Stores small backend runtime pointers such as the current local development
+user. This is not an authentication session model; production auth should use a
+real session boundary later.
 
 ### user_score_snapshots
 

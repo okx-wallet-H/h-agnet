@@ -133,11 +133,12 @@ Admin routes require `H_WALLET_ADMIN_TOKEN` on the backend and
 `Authorization: Bearer <token>` from the management backend only. Mobile
 frontend code must not use admin tokens or mutate reward and side quest rules.
 
-Current persistence is intentionally in-memory behind repository boundaries.
-The first database target is PostgreSQL; replacing the in-memory repositories
-should not require frontend or screen changes.
+Persistence is behind repository boundaries. Without `DATABASE_URL`, the backend
+uses in-memory storage for local UI work. With `DATABASE_URL`, it initializes the
+PostgreSQL schema and persists users, Agent Wallet bindings, cards,
+authorization grants, strategy runs, H Skill invocations, and admin audit logs.
 See `docs/architecture/database-schema.md` and
-`docs/database/001_initial_schema.sql` for the first database blueprint.
+`docs/database/001_initial_schema.sql` for the first schema.
 
 Production operation planning lives in:
 

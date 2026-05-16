@@ -1,4 +1,7 @@
 const authorizationGrants = []
+const {
+  persistAuthorizationGrant,
+} = require('../database/persistence')
 
 function createAgentAuthorizationPolicyRepository() {
   return {
@@ -20,6 +23,9 @@ function createAgentAuthorizationPolicyRepository() {
 
       return authorizationGrants.filter((grant) => grant.userId === userId)
     },
+    hydrate(grants = []) {
+      authorizationGrants.splice(0, authorizationGrants.length, ...grants)
+    },
     upsertGrant({ address = null, metadata = {}, scope, userId }) {
       const normalizedAddress = normalizeAddress(address)
       const existingGrant = authorizationGrants.find(
@@ -36,6 +42,7 @@ function createAgentAuthorizationPolicyRepository() {
           status: 'active',
           updatedAt: now,
         })
+        persistAuthorizationGrant(existingGrant)
 
         return existingGrant
       }
@@ -52,6 +59,7 @@ function createAgentAuthorizationPolicyRepository() {
       }
 
       authorizationGrants.unshift(grant)
+      persistAuthorizationGrant(grant)
 
       return grant
     },

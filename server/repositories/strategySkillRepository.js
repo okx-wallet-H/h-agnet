@@ -179,6 +179,10 @@ const officialStrategySkills = [
 
 const strategyRuns = []
 const hSkillInvocations = []
+const {
+  persistHSkillInvocation,
+  persistStrategyRun,
+} = require('../database/persistence')
 
 const strategySkillRepository = {
   listOfficialStrategies() {
@@ -203,6 +207,7 @@ const strategySkillRepository = {
 
   insertRun(run) {
     strategyRuns.unshift(clone(run))
+    persistStrategyRun(run)
 
     return clone(run)
   },
@@ -227,6 +232,7 @@ const strategySkillRepository = {
         : { ...currentRun, ...clone(updater) }
 
     strategyRuns[runIndex] = clone(nextRun)
+    persistStrategyRun(strategyRuns[runIndex])
 
     return clone(strategyRuns[runIndex])
   },
@@ -235,14 +241,27 @@ const strategySkillRepository = {
     return strategyRuns.map(clone)
   },
 
+  hydrateRuns(runs = []) {
+    strategyRuns.splice(0, strategyRuns.length, ...runs.map(clone))
+  },
+
   insertHSkillInvocation(invocation) {
     hSkillInvocations.unshift(clone(invocation))
+    persistHSkillInvocation(invocation)
 
     return clone(invocation)
   },
 
   listHSkillInvocations() {
     return hSkillInvocations.map(clone)
+  },
+
+  hydrateHSkillInvocations(invocations = []) {
+    hSkillInvocations.splice(
+      0,
+      hSkillInvocations.length,
+      ...invocations.map(clone),
+    )
   },
 }
 

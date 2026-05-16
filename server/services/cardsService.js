@@ -107,6 +107,7 @@ function updateCardStatus(card, status) {
   if (existingMetric) {
     existingMetric.value = statusMetric.value
     existingMetric.tone = statusMetric.tone
+    cardRepository.persist(card)
     return
   }
 
@@ -115,6 +116,7 @@ function updateCardStatus(card, status) {
     value: statusMetric.value,
     tone: statusMetric.tone,
   })
+  cardRepository.persist(card)
 }
 
 function getMetricValue(card, label, fallback = '待同步') {

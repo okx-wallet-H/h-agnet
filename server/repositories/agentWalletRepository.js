@@ -1,4 +1,5 @@
 const agentWalletBindings = []
+const { persistAgentWallet } = require('../database/persistence')
 
 function createAgentWalletRepository() {
   return {
@@ -6,6 +7,9 @@ function createAgentWalletRepository() {
       return (
         agentWalletBindings.find((binding) => binding.userId === userId) ?? null
       )
+    },
+    hydrate(bindings = []) {
+      agentWalletBindings.splice(0, agentWalletBindings.length, ...bindings)
     },
     upsertForUser(userId, patch = {}) {
       const existingBinding = agentWalletBindings.find(
@@ -15,6 +19,7 @@ function createAgentWalletRepository() {
 
       if (existingBinding) {
         Object.assign(existingBinding, patch, { updatedAt: now })
+        persistAgentWallet(existingBinding)
 
         return existingBinding
       }
@@ -37,6 +42,7 @@ function createAgentWalletRepository() {
       }
 
       agentWalletBindings.unshift(binding)
+      persistAgentWallet(binding)
 
       return binding
     },
