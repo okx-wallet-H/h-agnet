@@ -289,7 +289,7 @@ function TopNavigation({
     <View style={styles.topNav}>
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push(walletReady ? '/wallet' : '/wallet/connect')}
+        onPress={() => router.push(walletReady ? '/wallet' : '/auth/register')}
         style={styles.navButton}
       >
         <WalletCards color={appTheme.colors.goldBright} size={20} />
@@ -342,8 +342,8 @@ function WalletOnboardingNudge() {
           用邮箱验证码登录后，就可以在对话里启动赚币 Agent、充值、提现和生成交易卡。
         </AppText>
       </View>
-      <Button variant="secondary" onPress={() => router.push('/wallet/connect')}>
-        去创建
+      <Button variant="secondary" onPress={() => router.push('/auth/register')}>
+        输入邮箱
       </Button>
     </TerminalCard>
   )
@@ -613,8 +613,8 @@ function CommunityView() {
         <AppText color="textSecondary">
           任务评分会根据你的卡片记录生成，页面不会展示复杂链上参数。
         </AppText>
-        <Button fullWidth onPress={() => router.push('/wallet/connect')}>
-          创建 Agent 钱包
+        <Button fullWidth onPress={() => router.push('/auth/register')}>
+          输入邮箱创建钱包
         </Button>
       </TerminalCard>
     </View>

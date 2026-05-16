@@ -252,7 +252,12 @@ export default function WalletScreen() {
       </TerminalCard>
 
       <View style={styles.actions}>
-        <Button fullWidth onPress={() => router.push('/wallet/connect')}>
+        <Button
+          fullWidth
+          onPress={() =>
+            router.push(isConnected ? '/wallet/connect' : '/auth/register')
+          }
+        >
           {isConnected ? '管理 Agent 钱包' : '创建 Agent 钱包'}
         </Button>
         <Button
