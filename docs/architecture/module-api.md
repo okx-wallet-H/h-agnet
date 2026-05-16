@@ -30,6 +30,7 @@ H.wallet.session.status   → GET /api/h/v1/auth/agent-wallet/session
 H.card.wallet.created     → wallet-created conversation card
 H.card.library.list       → GET /api/h/v1/cards
 H.card.conversation.list  → GET /api/h/v1/cards/conversation
+H.card.trade.verify       → POST /api/h/v1/cards/:id/verify-trade
 H.agent.strategies     → GET /api/h/v1/agent/strategies
 H.agent.strategyPlan   → GET /api/h/v1/agent/strategies/:id/plan
 H.agent.skills         → GET /api/h/v1/agent/skill-wrappers
@@ -305,6 +306,11 @@ after H Wallet has received OKX swap data and passed the pre-execution
 simulation gate. If OKX data, wallet context, authorization, or simulation is
 missing, the continuation writes a blocked conversation card instead of a Card
 Library card.
+
+When a pending trade later has a transaction hash, `POST /cards/:id/verify-trade`
+checks OKX DEX History through `H.skill.gateway.trackOrder`. H Wallet only
+creates a `trade-success` card when OKX reports `success`. `pending`, `fail`,
+missing records, provider errors, or unknown states do not create success cards.
 
 Growth scoring v1 is exposed by `/boost/growth-summary`. It returns a
 transparent score, tier, task score, trust score, per-rule breakdown, recommended

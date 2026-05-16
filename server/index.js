@@ -27,6 +27,9 @@ const {
   continueAfterCardConfirmation,
 } = require('./services/cardConfirmationContinuationService')
 const {
+  verifyTradeResult,
+} = require('./services/tradeResultVerificationService')
+const {
   getWalletAccount,
   getWalletAddresses,
   getWalletAssets,
@@ -376,6 +379,20 @@ async function handleRequest(request, response) {
           },
           followupCards: continuation.cards,
         },
+      })
+      return
+    }
+
+    if (
+      request.method === 'POST' &&
+      routePath.match(/^\/cards\/[^/]+\/verify-trade$/)
+    ) {
+      const cardId = routePath.split('/')[2]
+      const body = await readJsonBody(request)
+
+      sendJson(response, 200, {
+        ok: true,
+        data: await verifyTradeResult(cardId, body),
       })
       return
     }
