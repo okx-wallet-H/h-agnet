@@ -5,7 +5,7 @@ import {
   Mail,
   ShieldCheck,
 } from 'lucide-react-native'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -25,6 +25,7 @@ import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme
 import { AgentWalletFlowCard } from '../../src/features/auth/components/AgentWalletFlowCard'
 import {
   useAgentWalletAuthStatus,
+  useAgentWalletSession,
   useRequestAgentWalletOtp,
 } from '../../src/features/auth/hooks/useAgentWalletAuth'
 import { getAgentWalletAuthStatus } from '../../src/services/auth/agentWalletAuthService'
@@ -36,6 +37,7 @@ export default function RegisterAgentWalletScreen() {
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
   const [email, setEmail] = useState('')
   const remoteStatus = useAgentWalletAuthStatus()
+  const walletSession = useAgentWalletSession()
   const requestOtp = useRequestAgentWalletOtp()
   const normalizedEmail = email.trim()
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
@@ -50,6 +52,12 @@ export default function RegisterAgentWalletScreen() {
       : requestOtp.isError
         ? '验证码请求失败，请稍后再试。'
         : null
+
+  useEffect(() => {
+    if (walletSession.data) {
+      router.replace('/home')
+    }
+  }, [walletSession.data])
 
   function continueToOtp() {
     if (!canContinue) {

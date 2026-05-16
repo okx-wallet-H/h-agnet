@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { KeyRound, Mail, WalletCards } from 'lucide-react-native'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 
 import { AppText } from '../../src/components/primitives/AppText'
@@ -10,7 +10,10 @@ import { ScreenHeader } from '../../src/components/terminal/ScreenHeader'
 import { TerminalCard } from '../../src/components/terminal/TerminalCard'
 import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme'
 import { AgentWalletFlowCard } from '../../src/features/auth/components/AgentWalletFlowCard'
-import { useAgentWalletAuthStatus } from '../../src/features/auth/hooks/useAgentWalletAuth'
+import {
+  useAgentWalletAuthStatus,
+  useAgentWalletSession,
+} from '../../src/features/auth/hooks/useAgentWalletAuth'
 import { getAgentWalletAuthStatus } from '../../src/services/auth/agentWalletAuthService'
 
 const authStatus = getAgentWalletAuthStatus()
@@ -19,8 +22,15 @@ export default function WalletConnectScreen() {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
   const remoteStatus = useAgentWalletAuthStatus()
+  const walletSession = useAgentWalletSession()
   const adapterStatus = remoteStatus.data?.status ?? 'not-configured'
   const ready = authStatus.status === 'ready' && adapterStatus === 'ready'
+
+  useEffect(() => {
+    if (walletSession.data) {
+      router.replace('/home')
+    }
+  }, [walletSession.data])
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
