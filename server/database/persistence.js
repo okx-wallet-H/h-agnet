@@ -157,6 +157,69 @@ function persistCard(card) {
   })
 }
 
+function persistAgentConversationMessage(message) {
+  scheduleWrite(async () => {
+    await query(
+      `
+        insert into ai_conversation_messages (
+          id, user_id, role, content, created_at
+        ) values ($1, $2, $3, $4, $5)
+        on conflict (id) do update set
+          user_id = excluded.user_id,
+          role = excluded.role,
+          content = excluded.content
+      `,
+      [
+        message.id,
+        message.userId ?? null,
+        message.role,
+        message.content,
+        message.createdAt,
+      ],
+    )
+  })
+}
+
+function persistAgentConversationTurn(turn) {
+  scheduleWrite(async () => {
+    await query(
+      `
+        insert into ai_conversation_turns (
+          id, user_id, intent, confidence, user_message_id,
+          assistant_message_id, process_steps, card_ids, execution_plan,
+          created_at, updated_at
+        ) values (
+          $1, $2, $3, $4, $5,
+          $6, $7::jsonb, $8::jsonb, $9::jsonb,
+          $10, now()
+        )
+        on conflict (id) do update set
+          user_id = excluded.user_id,
+          intent = excluded.intent,
+          confidence = excluded.confidence,
+          user_message_id = excluded.user_message_id,
+          assistant_message_id = excluded.assistant_message_id,
+          process_steps = excluded.process_steps,
+          card_ids = excluded.card_ids,
+          execution_plan = excluded.execution_plan,
+          updated_at = excluded.updated_at
+      `,
+      [
+        turn.id,
+        turn.userId ?? null,
+        turn.intent,
+        turn.confidence,
+        turn.userMessageId,
+        turn.assistantMessageId,
+        JSON.stringify(turn.processSteps ?? []),
+        JSON.stringify(turn.cardIds ?? []),
+        turn.executionPlan ? JSON.stringify(turn.executionPlan) : null,
+        turn.createdAt,
+      ],
+    )
+  })
+}
+
 function persistAuthorizationGrant(grant) {
   scheduleWrite(async () => {
     await query(
@@ -275,6 +338,8 @@ async function loadPersistedState() {
     agentWallets,
     cards,
     grants,
+    conversationMessages,
+    conversationTurns,
     strategyRuns,
     hSkillInvocations,
     adminAuditLogs,
@@ -284,6 +349,8 @@ async function loadPersistedState() {
     query('select * from agent_wallets order by created_at desc'),
     query('select * from cards order by created_at desc'),
     query('select * from agent_authorization_grants order by created_at desc'),
+    query('select * from ai_conversation_messages order by created_at asc'),
+    query('select * from ai_conversation_turns order by created_at asc'),
     query('select payload from strategy_runs order by created_at desc'),
     query('select payload from h_skill_invocations order by created_at desc'),
     query('select * from admin_audit_logs order by created_at desc limit 500'),
@@ -294,6 +361,8 @@ async function loadPersistedState() {
     agentWallets: agentWallets.rows.map(mapAgentWallet),
     authorizationGrants: grants.rows.map(mapAuthorizationGrant),
     cards: cards.rows.map(mapCard),
+    conversationMessages: conversationMessages.rows.map(mapConversationMessage),
+    conversationTurns: conversationTurns.rows.map(mapConversationTurn),
     currentUserId: runtimeState.rows[0]?.value ?? null,
     hSkillInvocations: hSkillInvocations.rows.map((row) => row.payload),
     strategyRuns: strategyRuns.rows.map((row) => row.payload),
@@ -318,6 +387,8 @@ function createEmptyState() {
     agentWallets: [],
     authorizationGrants: [],
     cards: [],
+    conversationMessages: [],
+    conversationTurns: [],
     currentUserId: null,
     hSkillInvocations: [],
     strategyRuns: [],
@@ -372,6 +443,31 @@ function mapCard(row) {
   }
 }
 
+function mapConversationMessage(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    role: row.role,
+    content: row.content,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapConversationTurn(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    createdAt: toIso(row.created_at),
+    intent: row.intent,
+    confidence: row.confidence,
+    userMessageId: row.user_message_id,
+    assistantMessageId: row.assistant_message_id,
+    processSteps: row.process_steps ?? [],
+    cardIds: row.card_ids ?? [],
+    executionPlan: row.execution_plan ?? null,
+  }
+}
+
 function mapAuthorizationGrant(row) {
   return {
     id: row.id,
@@ -409,6 +505,8 @@ module.exports = {
   initializePostgresPersistence,
   loadPersistedState,
   persistAdminAuditLog,
+  persistAgentConversationMessage,
+  persistAgentConversationTurn,
   persistAgentWallet,
   persistAuthorizationGrant,
   persistCard,

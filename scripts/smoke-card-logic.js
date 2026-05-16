@@ -6,14 +6,23 @@ const { cardRepository } = require('../server/repositories/cardRepository')
 const {
   agentAuthorizationPolicyRepository,
 } = require('../server/repositories/agentAuthorizationPolicyRepository')
+const {
+  agentConversationRepository,
+} = require('../server/repositories/agentConversationRepository')
 const { executeAgentCommand } = require('../server/agent/agentCommandPipeline')
 const { userRepository } = require('../server/repositories/userRepository')
 const {
+  archiveCard,
   createCard,
   getCardLibraryStats,
   listCards,
   listConversationCards,
 } = require('../server/services/cardsService')
+const {
+  attachCardToConversationTurn,
+  listAgentConversationTurns,
+  sendAgentConversationMessage,
+} = require('../server/services/agentConversationService')
 const {
   continueAfterCardConfirmation,
 } = require('../server/services/cardConfirmationContinuationService')
@@ -29,6 +38,7 @@ const {
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
+  const conversationTurnLinking = await smokeConversationTurnLinking()
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
   const verificationBoundary = await smokeVerificationBoundary()
@@ -39,6 +49,7 @@ async function main() {
         ok: true,
         authorizedBlockedPipeline,
         conversationBoundary,
+        conversationTurnLinking,
         executionHandoff,
         verificationBoundary,
       },
@@ -46,6 +57,43 @@ async function main() {
       2,
     ),
   )
+}
+
+async function smokeConversationTurnLinking() {
+  resetMemoryState()
+
+  const turn = await sendAgentConversationMessage({
+    content: '先帮我记录一下，今晚不要执行任何交易。',
+  })
+  const parentCard = turn.cards[0]
+  const receiptCard = createCard({
+    type: 'execution-receipt',
+    status: 'completed',
+    source: 'ai-agent',
+    title: '记录回执',
+    summary: '这只是服务层关联烟测，不代表链上执行。',
+    metrics: [{ label: '资产影响', value: '无', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'receipt', 'smoke-test'],
+  })
+
+  attachCardToConversationTurn(parentCard.id, receiptCard)
+  archiveCard(parentCard.id)
+
+  const turns = listAgentConversationTurns()
+  const hydratedTurn = turns.find((item) => item.id === turn.id)
+
+  assert.equal(turns.length, 1)
+  assert.equal(hydratedTurn.cards.length, 2)
+  assert.equal(hydratedTurn.cards[0].status, 'archived')
+  assert.equal(hydratedTurn.cards[1].id, receiptCard.id)
+  assert.equal(listCards().length, 0)
+
+  return {
+    attachedCards: hydratedTurn.cards.length,
+    cardLibraryCards: listCards().length,
+    parentStatus: hydratedTurn.cards[0].status,
+  }
 }
 
 async function smokeAuthorizedBlockedPipeline() {
@@ -243,6 +291,7 @@ async function smokeVerificationBoundary() {
 
 function resetMemoryState() {
   cardRepository.hydrate([])
+  agentConversationRepository.hydrate([], [])
   agentAuthorizationPolicyRepository.hydrate([])
   userRepository.hydrate([], null)
 

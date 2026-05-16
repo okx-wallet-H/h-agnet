@@ -73,6 +73,34 @@ create table if not exists card_events (
 create index if not exists card_events_card_created_idx
   on card_events(card_id, created_at desc);
 
+create table if not exists ai_conversation_messages (
+  id text primary key,
+  user_id text references users(id),
+  role text not null,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ai_conversation_messages_user_created_idx
+  on ai_conversation_messages(user_id, created_at asc);
+
+create table if not exists ai_conversation_turns (
+  id text primary key,
+  user_id text references users(id),
+  intent text not null,
+  confidence text not null,
+  user_message_id text references ai_conversation_messages(id),
+  assistant_message_id text references ai_conversation_messages(id),
+  process_steps jsonb not null default '[]'::jsonb,
+  card_ids jsonb not null default '[]'::jsonb,
+  execution_plan jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists ai_conversation_turns_user_created_idx
+  on ai_conversation_turns(user_id, created_at asc);
+
 create table if not exists agent_authorization_grants (
   id text primary key,
   user_id text references users(id),

@@ -23,6 +23,7 @@ Repository names should stay stable while implementations change:
 * `cardRepository`
 * `agentWalletRepository`
 * `agentAuthorizationPolicyRepository`
+* `agentConversationRepository`
 * `strategySkillRepository`
 * `sideQuestRuleRepository`
 * `scoringRuleRepository`
@@ -52,6 +53,14 @@ remain in their own product surfaces and do not enter the Card Library ledger.
 
 Append-only card lifecycle history, such as created, prepared for
 authorization, authorized, archived, verified, or blocked.
+
+### ai_conversation_messages / ai_conversation_turns
+
+Stores the AI chat surface separately from the Card Library. Turns keep message
+references, process steps, execution-plan metadata, and card ids. The service
+hydrates cards from `cards` when reading turns, so confirmation, archive,
+handoff, or verification status changes stay visible in the chat after a server
+restart.
 
 ### side_quest_rule_sets / side_quest_rules
 

@@ -1,5 +1,10 @@
 const { executeAgentCommand } = require('../agent/agentCommandPipeline')
+const {
+  agentConversationRepository,
+} = require('../repositories/agentConversationRepository')
+const { cardRepository } = require('../repositories/cardRepository')
 const { createCard } = require('./cardsService')
+const { getCurrentUserId } = require('./userIdentityService')
 const {
   prepareSwapPipeline,
 } = require('./agentExecutionPipelineService')
@@ -8,24 +13,21 @@ const {
   startOfficialStrategySkill,
 } = require('./strategySkillService')
 
-const messages = []
-const turns = []
-
 function nowIso() {
   return new Date().toISOString()
 }
 
 function createMessage(role, content) {
+  const messages = agentConversationRepository.listMessages()
   const message = {
     id: `message-${Date.now()}-${messages.length + 1}`,
+    userId: getCurrentUserId(),
     role,
     content,
     createdAt: nowIso(),
   }
 
-  messages.push(message)
-
-  return message
+  return agentConversationRepository.insertMessage(message)
 }
 
 async function sendAgentConversationMessage(input) {
@@ -40,41 +42,71 @@ async function sendAgentConversationMessage(input) {
     'assistant',
     commandResult.assistantText,
   )
-  const turn = {
+  const turns = agentConversationRepository.listTurns()
+  const turnRecord = {
     id: `turn-${Date.now()}-${turns.length + 1}`,
+    userId: getCurrentUserId(),
     createdAt: nowIso(),
     intent: commandResult.intent,
     confidence: commandResult.confidence,
-    userMessage,
-    assistantMessage,
+    userMessageId: userMessage.id,
+    assistantMessageId: assistantMessage.id,
     processSteps: commandResult.processSteps,
-    cards: commandResult.cards,
+    cardIds: commandResult.cards.map((card) => card.id),
     executionPlan: commandResult.executionPlan,
   }
 
-  turns.push(turn)
+  agentConversationRepository.insertTurn(turnRecord)
 
-  return turn
+  return hydrateTurn(turnRecord)
 }
 
 function listAgentConversationMessages() {
-  return [...messages]
+  return agentConversationRepository.listMessages()
 }
 
 function listAgentConversationTurns() {
-  return [...turns]
+  return agentConversationRepository.listTurns().map(hydrateTurn)
 }
 
 function attachCardToConversationTurn(parentCardId, card) {
-  const turn = turns.find((item) =>
-    item.cards.some((turnCard) => turnCard.id === parentCardId),
-  )
+  const turn = agentConversationRepository.findTurnByCardId(parentCardId)
 
-  if (!turn || turn.cards.some((turnCard) => turnCard.id === card.id)) {
+  if (!turn || turn.cardIds.includes(card.id)) {
     return
   }
 
-  turn.cards.push(card)
+  turn.cardIds.push(card.id)
+  agentConversationRepository.persistTurn(turn)
+}
+
+function hydrateTurn(turnRecord) {
+  return {
+    id: turnRecord.id,
+    createdAt: turnRecord.createdAt,
+    intent: turnRecord.intent,
+    confidence: turnRecord.confidence,
+    userMessage:
+      agentConversationRepository.findMessageById(turnRecord.userMessageId) ??
+      createMissingMessage(turnRecord.userMessageId, 'user'),
+    assistantMessage:
+      agentConversationRepository.findMessageById(turnRecord.assistantMessageId) ??
+      createMissingMessage(turnRecord.assistantMessageId, 'assistant'),
+    processSteps: turnRecord.processSteps,
+    cards: (turnRecord.cardIds ?? [])
+      .map((cardId) => cardRepository.findById(cardId))
+      .filter(Boolean),
+    executionPlan: turnRecord.executionPlan,
+  }
+}
+
+function createMissingMessage(messageId, role) {
+  return {
+    id: messageId,
+    role,
+    content: '',
+    createdAt: nowIso(),
+  }
 }
 
 module.exports = {
