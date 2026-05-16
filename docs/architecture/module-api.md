@@ -295,7 +295,9 @@ create non-proof conversation drafts such as `system-status`,
 `portfolio-insight`, or `side-quest` with `source: user-action`; they cannot
 create trade-success, wallet-created, execution-receipt, pending-execution, or
 service/OKX-sourced cards. Proof-like cards must come from backend modules,
-H Skill wrappers, execution handoff, or OKX verification.
+H Skill wrappers, execution handoff, or OKX verification. The backend ignores
+client-supplied ownership and completion fields for this endpoint; `userId` is
+resolved server-side and `completedAt` is never accepted for client drafts.
 
 Card Library stats keep the legacy response shape for app compatibility, but
 the counters are derived only from the eligible trading subset:

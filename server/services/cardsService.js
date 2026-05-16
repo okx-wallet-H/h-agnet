@@ -576,7 +576,16 @@ function createClientConversationCard(input) {
     )
   }
 
-  return createCard(input)
+  return createCard({
+    type: input.type,
+    status: 'draft',
+    source: 'user-action',
+    title: input.title,
+    summary: input.summary,
+    metrics: input.metrics,
+    metadata: input.metadata,
+    tags: input.tags,
+  })
 }
 
 function listCards() {

@@ -66,6 +66,7 @@ function smokeClientCardBoundary() {
   resetMemoryState()
 
   const noteCard = createClientConversationCard({
+    completedAt: '2099-01-01T00:00:00.000Z',
     type: 'system-status',
     status: 'draft',
     source: 'user-action',
@@ -74,9 +75,12 @@ function smokeClientCardBoundary() {
     metrics: [{ label: '资产影响', value: '无', tone: 'gold' }],
     metadata: {},
     tags: ['conversation', 'system', 'client-note'],
+    userId: 'user-attacker',
   })
 
   assert.equal(noteCard.status, 'draft')
+  assert.equal(noteCard.userId !== 'user-attacker', true)
+  assert.equal(noteCard.completedAt, undefined)
   assert.equal(listCards().length, 0)
 
   assert.throws(
@@ -97,6 +101,7 @@ function smokeClientCardBoundary() {
   return {
     clientDraftCreated: true,
     forgedTradeSuccessRejected: true,
+    ignoredClientOwnership: true,
     cardLibraryCards: listCards().length,
   }
 }
