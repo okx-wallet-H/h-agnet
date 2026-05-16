@@ -398,6 +398,8 @@ function getPreflightInvocationInput({ input, strategy, wrapperId }) {
 
   if (wrapperId === 'H.skill.market.readDexTrends') {
     return {
+      chain: normalizePreflightText(input.chain),
+      chainIndex: normalizePreflightText(input.chainIndex),
       strategyId: strategy.id,
       limit: normalizePreflightText(input.marketLimit) || '5',
     }
@@ -405,6 +407,8 @@ function getPreflightInvocationInput({ input, strategy, wrapperId }) {
 
   if (wrapperId === 'H.skill.signal.readOnchainSignals') {
     return {
+      chain: normalizePreflightText(input.chain),
+      chainIndex: normalizePreflightText(input.chainIndex),
       strategyId: strategy.id,
       limit: normalizePreflightText(input.signalLimit) || '5',
     }

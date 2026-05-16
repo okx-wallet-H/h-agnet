@@ -54,6 +54,12 @@ export type AgentConversationExecutionPlan = {
     | 'identity-and-user-authorization-required'
     | 'no-asset-action'
     | 'user-authorization-required'
+  runnerPreflight?: {
+    blockedCount: number
+    completedCount: number
+    runId: string
+    waitingCount: number
+  } | null
   userFacingComplexity: 'simple-card'
 }
 

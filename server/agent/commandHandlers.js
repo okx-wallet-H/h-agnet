@@ -163,9 +163,71 @@ function createBoostCommand({ createCard }) {
   }
 }
 
-function createEarningAgentCommand({ content, startOfficialStrategy }) {
+async function createEarningAgentCommand({
+  content,
+  createCard,
+  runStrategyPreflight,
+  startOfficialStrategy,
+}) {
   const strategyId = detectEarningStrategyId(content)
   const result = startOfficialStrategy({ strategyId })
+  const cards = [result.card]
+  let preflight = null
+  let preflightCopy =
+    '我会继续做只读预检，把复杂过程折叠在后台，只把结果卡片给你看。'
+
+  if (typeof runStrategyPreflight === 'function') {
+    try {
+      const preflightResult = await runStrategyPreflight({
+        input: buildStrategyPreflightInput(content),
+        runId: result.run.id,
+      })
+
+      preflight = preflightResult.preflight
+      cards.push(preflightResult.card)
+      preflightCopy = `我已经顺手完成只读预检：完成 ${preflight.completedCount} 项，等待 ${preflight.waitingCount} 项；没有签名、没有广播。`
+    } catch (error) {
+      const card = createCard({
+        type: 'system-status',
+        status: 'blocked',
+        source: 'ai-agent',
+        title: `${result.strategy.name} 预检暂停`,
+        summary:
+          error instanceof Error && error.message
+            ? error.message
+            : 'Runner 只读预检暂时失败。启动卡仍然有效，但不会进入执行。',
+        metrics: [
+          { label: '预检状态', value: '已暂停', tone: 'danger' },
+          { label: '资产影响', value: '无', tone: 'gold' },
+          { label: '执行状态', value: '未广播', tone: 'danger' },
+        ],
+        metadata: {
+          runId: result.run.id,
+          strategyId: result.strategy.id,
+          strategyName: result.strategy.name,
+          strategyVersion: result.strategy.version,
+        },
+        tags: [
+          'agent',
+          'earning-agent',
+          'runner-status',
+          'preflight',
+          'blocked',
+          `strategy:${result.strategy.id}`,
+          `run:${result.run.id}`,
+        ],
+      })
+
+      cards.push(card)
+      preflight = {
+        blockedCount: 1,
+        completedCount: 0,
+        runId: result.run.id,
+        waitingCount: 0,
+      }
+      preflightCopy = '只读预检暂时暂停了，启动卡仍然保留；我不会进入任何资产动作。'
+    }
+  }
 
   return {
     actionLabel: `启动${result.strategy.name}`,
@@ -175,10 +237,41 @@ function createEarningAgentCommand({ content, startOfficialStrategy }) {
       scope: result.strategy.authorizationScope,
     },
     assistantText:
-      `我已经把「${result.strategy.name}」启动卡准备好了。你先看卡片：授权前不会动用资产；后续只会通过 H Skill 调用 OKX OnchainOS 能力。`,
-    cards: [result.card],
+      `我已经把「${result.strategy.name}」启动卡准备好了。${preflightCopy}`,
+    cards,
+    preflight,
     requiredConfirmation: true,
   }
+}
+
+function buildStrategyPreflightInput(content) {
+  const chain = detectChain(content)
+  const tokenAddress = extractAddress(content)
+  const { tokenSymbol } = extractAmountToken(content)
+  const token =
+    tokenSymbol !== '待选择' ? tokenSymbol : extractLikelyTokenSymbol(content)
+
+  return {
+    chain: chain === '待选择' ? undefined : chain,
+    operation: 'buy',
+    token: token || undefined,
+    tokenAddress: tokenAddress || undefined,
+  }
+}
+
+function extractLikelyTokenSymbol(content) {
+  const ignored = new Set([
+    'AI',
+    'AGENT',
+    'H',
+    'OKX',
+    'ONCHAIN',
+    'OS',
+    'WEB3',
+  ])
+  const matches = content.match(/\b[A-Z][A-Z0-9]{1,12}\b/g) ?? []
+
+  return matches.find((item) => !ignored.has(item.toUpperCase())) ?? ''
 }
 
 function createPortfolioCommand({ createCard }) {

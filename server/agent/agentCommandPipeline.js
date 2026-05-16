@@ -48,6 +48,7 @@ async function executeAgentCommand(input, dependencies) {
     content,
     createCard: dependencies.createCard,
     prepareSwap: dependencies.prepareSwap,
+    runStrategyPreflight: dependencies.runStrategyPreflight,
     startOfficialStrategy: dependencies.startOfficialStrategy,
   })
   const authorization = evaluateAgentAuthorization(
@@ -79,7 +80,10 @@ function applyAuthorizationToCards(cards, authorization) {
       },
     }
 
-    if (authorization.authorizationStatus !== 'agent-authorized') {
+    if (
+      authorization.authorizationStatus !== 'agent-authorized' ||
+      isStatusOnlyCard(card)
+    ) {
       return
     }
 
@@ -103,6 +107,10 @@ function applyAuthorizationToCards(cards, authorization) {
       tone: 'gold',
     })
   })
+}
+
+function isStatusOnlyCard(card) {
+  return card.tags.includes('preflight') || card.tags.includes('runner-status')
 }
 
 function getAuthorizedSummary(card) {
@@ -199,7 +207,7 @@ function buildProcessSteps(intent, commandResult, authorization) {
         status: 'done',
       }
 
-  return [
+  const steps = [
     {
       id: 'understand',
       title: '理解你的目标',
@@ -214,6 +222,17 @@ function buildProcessSteps(intent, commandResult, authorization) {
     },
     gateStep,
   ]
+
+  if (commandResult.preflight) {
+    steps.push({
+      id: 'preflight',
+      title: '完成只读预检',
+      detail: `已完成 ${commandResult.preflight.completedCount} 项，等待 ${commandResult.preflight.waitingCount} 项；不会签名或广播。`,
+      status: commandResult.preflight.blockedCount > 0 ? 'blocked' : 'done',
+    })
+  }
+
+  return steps
 }
 
 function buildExecutionPlan(intent, commandResult, authorization) {
@@ -231,6 +250,14 @@ function buildExecutionPlan(intent, commandResult, authorization) {
     scope: authorization.scope,
     executionMode: authorization.executionMode,
     safetyGate: authorization.safetyGate,
+    runnerPreflight: commandResult.preflight
+      ? {
+          blockedCount: commandResult.preflight.blockedCount,
+          completedCount: commandResult.preflight.completedCount,
+          runId: commandResult.preflight.runId,
+          waitingCount: commandResult.preflight.waitingCount,
+        }
+      : null,
     userFacingComplexity: 'simple-card',
   }
 }
