@@ -82,7 +82,8 @@ function applyAuthorizationToCards(cards, authorization) {
 
     if (
       authorization.authorizationStatus !== 'agent-authorized' ||
-      isStatusOnlyCard(card)
+      isStatusOnlyCard(card) ||
+      !canApplyAgentAuthorizedStatus(card)
     ) {
       return
     }
@@ -111,6 +112,10 @@ function applyAuthorizationToCards(cards, authorization) {
 
 function isStatusOnlyCard(card) {
   return card.tags.includes('preflight') || card.tags.includes('runner-status')
+}
+
+function canApplyAgentAuthorizedStatus(card) {
+  return ['draft', 'requires-confirmation', 'confirmed'].includes(card.status)
 }
 
 function getAuthorizedSummary(card) {

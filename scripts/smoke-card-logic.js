@@ -6,6 +6,7 @@ const { cardRepository } = require('../server/repositories/cardRepository')
 const {
   agentAuthorizationPolicyRepository,
 } = require('../server/repositories/agentAuthorizationPolicyRepository')
+const { executeAgentCommand } = require('../server/agent/agentCommandPipeline')
 const { userRepository } = require('../server/repositories/userRepository')
 const {
   createCard,
@@ -17,6 +18,9 @@ const {
   continueAfterCardConfirmation,
 } = require('../server/services/cardConfirmationContinuationService')
 const {
+  prepareSwapPipeline,
+} = require('../server/services/agentExecutionPipelineService')
+const {
   verifyTradeResult,
 } = require('../server/services/tradeResultVerificationService')
 const {
@@ -25,6 +29,7 @@ const {
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
+  const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
   const verificationBoundary = await smokeVerificationBoundary()
 
@@ -32,6 +37,7 @@ async function main() {
     JSON.stringify(
       {
         ok: true,
+        authorizedBlockedPipeline,
         conversationBoundary,
         executionHandoff,
         verificationBoundary,
@@ -40,6 +46,43 @@ async function main() {
       2,
     ),
   )
+}
+
+async function smokeAuthorizedBlockedPipeline() {
+  const user = resetMemoryState()
+
+  agentAuthorizationPolicyRepository.upsertGrant({
+    metadata: {
+      source: 'smoke-card-logic',
+    },
+    scope: 'trade-autonomy',
+    userId: user.id,
+  })
+
+  const result = await executeAgentCommand(
+    {
+      content: '帮我把 ETH 兑换成 USDC',
+    },
+    {
+      createCard,
+      prepareSwap: prepareSwapPipeline,
+    },
+  )
+  const card = result.cards[0]
+
+  assert.equal(card.type, 'trade-confirmation')
+  assert.equal(card.status, 'blocked')
+  assert.equal(
+    card.metadata.agentAuthorization.authorizationStatus,
+    'agent-authorized',
+  )
+  assert.equal(listCards().length, 0)
+
+  return {
+    authorizationStatus: card.metadata.agentAuthorization.authorizationStatus,
+    cardLibraryCards: listCards().length,
+    cardStatus: card.status,
+  }
 }
 
 async function smokeConversationBoundary() {
