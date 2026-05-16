@@ -728,7 +728,7 @@ function readString(value) {
 function archiveCard(cardId) {
   const card = cardRepository.findById(cardId)
 
-  if (!card) {
+  if (!card || !isCurrentUserCard(card)) {
     return { archived: false }
   }
 
@@ -743,6 +743,7 @@ function prepareCardForConfirmation(cardId) {
   if (!card) {
     throw createHttpError(404, 'not-found', '卡片不存在。')
   }
+  assertCurrentUserCard(card)
 
   if (card.status === 'archived') {
     throw createHttpError(409, 'invalid-card-state', '已归档卡片不能进入授权队列。')
@@ -785,6 +786,7 @@ function confirmCardReview(cardId) {
   if (!card) {
     throw createHttpError(404, 'not-found', '卡片不存在。')
   }
+  assertCurrentUserCard(card)
 
   if (card.status === 'archived') {
     throw createHttpError(409, 'invalid-card-state', '已归档卡片不能授权。')
@@ -837,6 +839,24 @@ function confirmCardReview(cardId) {
   updateCardStatus(card, 'confirmed')
 
   return createConfirmationResult(card)
+}
+
+function assertCurrentUserCard(card) {
+  if (isCurrentUserCard(card)) {
+    return
+  }
+
+  throw createHttpError(404, 'not-found', '卡片不存在。')
+}
+
+function isCurrentUserCard(card) {
+  const currentUserId = getCurrentUserId()
+
+  if (!card.userId) {
+    return true
+  }
+
+  return Boolean(currentUserId) && card.userId === currentUserId
 }
 
 function createConfirmationResult(card) {

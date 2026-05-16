@@ -40,6 +40,7 @@ const {
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
   const clientCardBoundary = smokeClientCardBoundary()
+  const cardOwnershipBoundary = await smokeCardOwnershipBoundary()
   const conversationTurnLinking = await smokeConversationTurnLinking()
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
@@ -50,6 +51,7 @@ async function main() {
       {
         ok: true,
         authorizedBlockedPipeline,
+        cardOwnershipBoundary,
         clientCardBoundary,
         conversationBoundary,
         conversationTurnLinking,
@@ -60,6 +62,55 @@ async function main() {
       2,
     ),
   )
+}
+
+async function smokeCardOwnershipBoundary() {
+  const owner = resetMemoryState()
+  const ownedCard = createCard({
+    type: 'system-status',
+    status: 'draft',
+    source: 'ai-agent',
+    title: '本人卡片',
+    summary: '本人可以归档自己的卡片。',
+    metrics: [{ label: '资产影响', value: '无', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'system', 'ownership'],
+  })
+  const otherCard = createCard({
+    type: 'trade-confirmation',
+    status: 'pending-execution',
+    source: 'ai-agent',
+    title: '他人交易卡',
+    summary: '不能验证不属于当前用户的交易卡。',
+    metrics: [{ label: '状态', value: '交易中', tone: 'gold' }],
+    metadata: {
+      txHash: '0x1111222233334444555566667777888899990000',
+      pipeline: {
+        intent: {
+          chain: 'ethereum',
+        },
+        stage: 'prepared',
+      },
+    },
+    tags: ['conversation', 'trading'],
+  })
+
+  otherCard.userId = 'user-other'
+  cardRepository.persist(otherCard)
+
+  assert.deepEqual(archiveCard(otherCard.id), { archived: false })
+  await assert.rejects(
+    () => verifyTradeResult(otherCard.id, { chain: 'ethereum' }),
+    (error) => error.code === 'not-found',
+  )
+  assert.equal(ownedCard.userId, owner.id)
+  assert.deepEqual(archiveCard(ownedCard.id), { archived: true })
+
+  return {
+    blockedCrossUserArchive: true,
+    blockedCrossUserVerify: true,
+    currentUserId: owner.id,
+  }
 }
 
 function smokeClientCardBoundary() {

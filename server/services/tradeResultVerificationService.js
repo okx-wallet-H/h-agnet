@@ -1,6 +1,7 @@
 const { cardRepository } = require('../repositories/cardRepository')
 const { createCard } = require('./cardsService')
 const { invokeHSkill } = require('./hSkillRuntimeService')
+const { getCurrentUserId } = require('./userIdentityService')
 
 async function verifyTradeResult(cardId, input = {}) {
   const card = cardRepository.findById(cardId)
@@ -8,6 +9,7 @@ async function verifyTradeResult(cardId, input = {}) {
   if (!card) {
     throwHttpError(404, 'not-found', '交易卡不存在。')
   }
+  assertCurrentUserCard(card)
 
   if (card.type !== 'trade-confirmation') {
     throwHttpError(409, 'invalid-card-type', '只有交易过程卡可以验证结果。')
@@ -74,6 +76,16 @@ async function verifyTradeResult(cardId, input = {}) {
     successCard: null,
     tracking: tracking.invocation,
   }
+}
+
+function assertCurrentUserCard(card) {
+  const currentUserId = getCurrentUserId()
+
+  if (!card.userId || (currentUserId && card.userId === currentUserId)) {
+    return
+  }
+
+  throwHttpError(404, 'not-found', '交易卡不存在。')
 }
 
 function createTrackingInput(card, input) {
