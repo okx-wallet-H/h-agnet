@@ -152,6 +152,14 @@ Wallet fields such as token, wallet type, trigger wallet count, amount USD,
 sold ratio, and holding bias. These signals must never trigger asset actions by
 themselves; they only inform strategy planning, risk review, and card output.
 
+`H.skill.token.analyzeRisk` maps to `okx-dex-token` / OKX Token Search and
+Token Advanced Info APIs. It is a read-only token profile adapter. Token search
+resolves symbols or contract addresses into OKX token candidates, while
+advanced-info adds creator, tag, holder concentration, and risk-control
+metadata when one token is selected. This wrapper does not produce a final
+security verdict and must not be used as a substitute for OKX Security
+token-scan.
+
 The first risk-gate invoke target is `H.skill.risk.scanTransaction`. Its first
 connected provider method is `okx-security` / token-scan through
 `/api/v6/security/token-scan`. This scans contract tokens and normalizes OKX's

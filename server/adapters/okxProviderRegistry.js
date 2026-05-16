@@ -80,6 +80,12 @@ const providerDefinitions = [
     transport: 'okx-onchainos-skill',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: 'Token 风险、持仓集中度、交易热度和链上画像分析',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation:
+          '当前开放 token/search 与 token/advanced-info 只读画像；安全结论仍由 OKX Security token-scan 提供。',
+        supportedMethods: getReadyProviderMethods('okx-dex-token'),
+      }),
   },
   {
     id: 'okx-dex-market',

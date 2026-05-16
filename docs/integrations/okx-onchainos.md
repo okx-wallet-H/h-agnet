@@ -33,6 +33,7 @@ Ready now:
 * OKX DEX swap-data adapter boundary
 * OKX DEX Hot Token market-trend adapter boundary
 * OKX DEX Signal List read-only adapter boundary
+* OKX DEX Token Search / Advanced Info read-only profile boundary
 * OKX Security Token Scan risk-gate adapter boundary
 * OKX Transaction API simulation adapter boundary
 * OKX DEX transaction status tracking boundary
@@ -141,6 +142,8 @@ Official OKX Onchain endpoints:
 * Transaction status: `GET /api/v6/dex/aggregator/history`
 * DEX market trends: `GET /api/v6/dex/market/token/hot-token`
 * DEX buy signals: `POST /api/v6/dex/market/signal/list`
+* Token search: `GET /api/v6/dex/market/token/search`
+* Token advanced info: `GET /api/v6/dex/market/token/advanced-info`
 * Token security scan: `POST /api/v6/security/token-scan`
 
 These calls stay server-side behind H Wallet APIs.
@@ -171,6 +174,12 @@ H.skill.signal.readOnchainSignals
 → OKX Signal List response
 → H Wallet normalized signal rows
 → read-only strategy input
+
+H.skill.token.analyzeRisk
+→ server-only OKX signed request
+→ OKX Token Search / Advanced Info response
+→ H Wallet normalized token profile
+→ read-only strategy input, not a final security verdict
 
 H.skill.risk.scanTransaction
 → token-scan input: chain + contract token address

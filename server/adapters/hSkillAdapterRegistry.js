@@ -55,7 +55,7 @@ const adapterDefinitions = [
     wrapperId: 'H.skill.token.analyzeRisk',
     providerSkill: 'okx-dex-token',
     providerMethod: 'tokenSearch',
-    adapterStatus: 'adapter-shell',
+    adapterStatus: 'ready',
     executionMode: 'read-only-adapter',
     assetImpact: 'none',
     failStrategy: 'block-on-error',
@@ -64,6 +64,10 @@ const adapterDefinitions = [
       {
         label: 'OKX OnchainOS Token Search API',
         url: 'https://web3.okx.com/zh-hans/onchainos/dev-docs/market/market-token-search',
+      },
+      {
+        label: 'OKX OnchainOS Token Advanced Info API',
+        url: 'https://web3.okx.com/zh-hans/onchainos/dev-docs/market/market-token-advanced-info',
       },
     ],
   },

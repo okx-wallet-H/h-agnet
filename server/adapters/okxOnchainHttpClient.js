@@ -171,6 +171,19 @@ async function searchTokens(input = {}) {
   })
 }
 
+async function getTokenAdvancedInfo(input = {}) {
+  return request('GET', '/api/v6/dex/market/token/advanced-info', {
+    chainIndex: normalizeChainIndex(input.chainIndex ?? input.chain),
+    tokenContractAddress: normalizeRequiredText(
+      input.tokenContractAddress ??
+        input.contractAddress ??
+        input.tokenAddress ??
+        input.address,
+      'tokenContractAddress',
+    ),
+  })
+}
+
 async function scanTokens(input = {}) {
   return request('POST', '/api/v6/security/token-scan', {
     source: normalizeOptionalText(input.source) ?? 'onchain_os_cli',
@@ -477,6 +490,7 @@ module.exports = {
   getSignalList,
   getSignalSupportedChains,
   getStatus,
+  getTokenAdvancedInfo,
   searchTokens,
   scanTokens,
   getSwapData,

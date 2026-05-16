@@ -456,20 +456,84 @@ async function invokeTokenAnalyzeRisk(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'dex-token-adapter-not-connected',
-    message:
-      '代币画像协议已识别；真实 okx-dex-token adapter 尚未接入。H Wallet 不伪造风险标签或持仓画像。',
-    resultData: {
-      tokenGate: 'blocked',
-      tokenProvider: 'okx-dex-token',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-dex-token',
-    },
-  })
+  try {
+    const requestInput = mapTokenAnalysisInput(input)
+    const output = await okxOnchainHttpClient.searchTokens(requestInput)
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-dex-token-search-rejected',
+        message:
+          'OKX Token Search API 未返回成功结果，H Wallet 不生成自有代币画像。',
+        resultData: {
+          tokenGate: 'blocked',
+          tokenProvider: 'okx-dex-token',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    const candidates = normalizeOkxTokenSearchResults(output.response)
+    const selection = selectTokenAnalysisCandidate(candidates, requestInput)
+    const enrichment = await readTokenAdvancedInfo(selection.selectedToken)
+    const warnings = getTokenProfileWarnings(
+      selection.selectedToken,
+      enrichment.advancedInfo,
+    )
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-token-profile-completed',
+      message: getTokenAnalysisMessage(selection),
+      resultData: {
+        tokenGate: 'completed',
+        tokenProvider: 'okx-dex-token',
+        action: 'observe',
+        provider: 'okx-dex-token',
+        source: 'okx-onchainos-api',
+        analysisBoundary: 'token-search-and-advanced-info-only',
+        securityVerdict: 'not-included-use-H.skill.risk.scanTransaction',
+        requiredNextGate: selection.selectedToken
+          ? 'H.skill.risk.scanTransaction'
+          : null,
+        request: output.request,
+        requestContext: requestInput.context,
+        resolutionStatus: selection.resolutionStatus,
+        candidateCount: candidates.length,
+        selectedToken: selection.selectedToken,
+        candidates,
+        advancedInfoStatus: enrichment.advancedInfoStatus,
+        advancedInfo: enrichment.advancedInfo,
+        warnings: warnings.length ? warnings : null,
+        providerResponse: {
+          search: output.response,
+          advancedInfo: enrichment.providerResponse,
+        },
+        providerError: enrichment.providerError,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-token-profile-error',
+      fallbackMessage:
+        'OKX Token API 请求失败。H Wallet 不生成自有代币画像。',
+      error,
+      resultData: {
+        tokenGate: 'blocked',
+        tokenProvider: 'okx-dex-token',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-dex-token',
+      },
+    })
+  }
 }
 
 async function invokeMarketReadDexTrends(wrapper, input) {
@@ -1303,7 +1367,10 @@ function validateTokenAnalysisInput(input) {
   }
 
   const token = normalizeString(input.token)
-  const tokenAddress = normalizeString(input.tokenAddress)
+  const tokenAddress =
+    normalizeString(input.tokenAddress) ||
+    normalizeString(input.contractAddress) ||
+    normalizeString(input.address)
   const chain = normalizeString(input.chain)
   const chainIndex = normalizeString(input.chainIndex)
 
@@ -2012,6 +2079,309 @@ function getRiskScanMessage(aggregate) {
   }
 
   return 'OKX Security 已完成 Token Scan，未发现阻断级 token 风险。'
+}
+
+function mapTokenAnalysisInput(input) {
+  const tokenAddress =
+    normalizeString(input.tokenAddress) ||
+    normalizeString(input.contractAddress) ||
+    normalizeString(input.address)
+  const token = normalizeString(input.token)
+  const chain = normalizeString(input.chain)
+  const chainIndex = normalizeString(input.chainIndex)
+  const chains =
+    normalizeString(input.chains) ||
+    normalizeString(input.chainIndexes) ||
+    chainIndex ||
+    chain
+
+  return {
+    chains,
+    search: tokenAddress || token,
+    cursor: normalizeString(input.cursor),
+    limit: normalizeString(input.limit) || '20',
+    tokenAddress,
+    context: {
+      tokenInputType: tokenAddress ? 'token-address' : 'token',
+      token: token || null,
+      tokenAddress: tokenAddress || null,
+      chain: chain || null,
+      chainIndex: chainIndex || null,
+      chains,
+    },
+  }
+}
+
+function normalizeOkxTokenSearchResults(response) {
+  return getOkxResponseRows(response)
+    .map((row, index) => normalizeOkxTokenSearchResult(row, index))
+    .filter(Boolean)
+}
+
+function normalizeOkxTokenSearchResult(row, index) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return null
+  }
+
+  const tagList =
+    row.tagList && typeof row.tagList === 'object' && !Array.isArray(row.tagList)
+      ? row.tagList
+      : null
+  const communityRecognized =
+    tagList?.communityRecognized ??
+    pickFirst(row, ['communityRecognized', 'isCommunityRecognized'])
+
+  return removeEmptyFields({
+    listPosition: index + 1,
+    chainIndex: pickFirst(row, ['chainIndex', 'chainId']),
+    tokenName: pickFirst(row, ['tokenName', 'name']),
+    tokenSymbol: pickFirst(row, ['tokenSymbol', 'symbol']),
+    tokenAddress: pickFirst(row, [
+      'tokenContractAddress',
+      'tokenAddress',
+      'contractAddress',
+      'address',
+    ]),
+    decimal: pickFirst(row, ['decimal', 'decimals']),
+    explorerUrl: pickFirst(row, ['explorerUrl']),
+    cursor: pickFirst(row, ['cursor']),
+    tokenLogoUrl: pickFirst(row, ['tokenLogoUrl', 'logoUrl', 'logo']),
+    priceUsd: pickFirst(row, ['price', 'priceUsd']),
+    priceChange24hPercent: pickFirst(row, [
+      'change',
+      'priceChange24H',
+      'priceChange24h',
+    ]),
+    holders: pickFirst(row, ['holders', 'holderCount']),
+    liquidityUsd: pickFirst(row, ['liquidity', 'liquidityUsd']),
+    marketCapUsd: pickFirst(row, ['marketCap', 'marketCapUsd']),
+    tagList,
+    communityRecognized,
+  })
+}
+
+function selectTokenAnalysisCandidate(candidates, requestInput) {
+  if (candidates.length === 0) {
+    return {
+      resolutionStatus: 'not-found',
+      selectedToken: null,
+    }
+  }
+
+  const exactMatch = requestInput.tokenAddress
+    ? candidates.find((candidate) =>
+        sameTokenAddress(candidate.tokenAddress, requestInput.tokenAddress),
+      )
+    : null
+
+  if (exactMatch) {
+    return {
+      resolutionStatus: 'exact-address-match',
+      selectedToken: exactMatch,
+    }
+  }
+
+  if (candidates.length === 1) {
+    return {
+      resolutionStatus: 'single-candidate',
+      selectedToken: candidates[0],
+    }
+  }
+
+  return {
+    resolutionStatus: 'multiple-candidates',
+    selectedToken: null,
+  }
+}
+
+async function readTokenAdvancedInfo(selectedToken) {
+  if (!selectedToken?.chainIndex || !selectedToken?.tokenAddress) {
+    return {
+      advancedInfo: null,
+      advancedInfoStatus: 'not-requested',
+      providerError: null,
+      providerResponse: null,
+    }
+  }
+
+  try {
+    const output = await okxOnchainHttpClient.getTokenAdvancedInfo({
+      chainIndex: selectedToken.chainIndex,
+      tokenContractAddress: selectedToken.tokenAddress,
+    })
+
+    if (!output.ok) {
+      return {
+        advancedInfo: null,
+        advancedInfoStatus: 'provider-rejected',
+        providerError: null,
+        providerResponse: output.response,
+      }
+    }
+
+    const advancedInfo = normalizeOkxTokenAdvancedInfo(output.response)
+
+    return {
+      advancedInfo,
+      advancedInfoStatus: advancedInfo ? 'completed' : 'empty',
+      providerError: null,
+      providerResponse: output.response,
+    }
+  } catch (error) {
+    return {
+      advancedInfo: null,
+      advancedInfoStatus: 'provider-error',
+      providerError: getProviderErrorData(error),
+      providerResponse: null,
+    }
+  }
+}
+
+function normalizeOkxTokenAdvancedInfo(response) {
+  const row = getOkxResponseRecord(response)
+
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return null
+  }
+
+  const riskControlLevel = pickFirst(row, ['riskControlLevel'])
+
+  return removeEmptyFields({
+    chainIndex: pickFirst(row, ['chainIndex', 'chainId']),
+    tokenAddress: pickFirst(row, [
+      'tokenContractAddress',
+      'tokenAddress',
+      'contractAddress',
+    ]),
+    riskControlLevel,
+    riskControlLabel: normalizeTokenRiskControlLevel(riskControlLevel),
+    tokenTags: pickFirst(row, ['tokenTags']),
+    createTime: pickFirst(row, ['createTime']),
+    creatorAddress: pickFirst(row, ['creatorAddress']),
+    devCreateTokenCount: pickFirst(row, ['devCreateTokenCount']),
+    devLaunchedTokenCount: pickFirst(row, ['devLaunchedTokenCount']),
+    devRugPullTokenCount: pickFirst(row, ['devRugPullTokenCount']),
+    top10HoldPercent: pickFirst(row, ['top10HoldPercent']),
+    devHoldingPercent: pickFirst(row, ['devHoldingPercent']),
+    bundleHoldingPercent: pickFirst(row, ['bundleHoldingPercent']),
+    suspiciousHoldingPercent: pickFirst(row, ['suspiciousHoldingPercent']),
+    sniperHoldingPercent: pickFirst(row, ['sniperHoldingPercent']),
+    snipersClearAddressCount: pickFirst(row, ['snipersClearAddressCount']),
+    snipersTotal: pickFirst(row, ['snipersTotal']),
+    lpBurnedPercent: pickFirst(row, ['lpBurnedPercent']),
+    isInternal: pickFirst(row, ['isInternal']),
+    protocolId: pickFirst(row, ['protocolId']),
+    progress: pickFirst(row, ['progress']),
+    totalFee: pickFirst(row, ['totalFee']),
+  })
+}
+
+function normalizeTokenRiskControlLevel(input) {
+  const value = normalizeString(input)
+  const labelMap = {
+    '0': 'undefined',
+    '1': 'low',
+    '2': 'medium',
+    '3': 'medium-high',
+    '4': 'high',
+    '5': 'high-manual',
+  }
+
+  return labelMap[value] ?? null
+}
+
+function getTokenProfileWarnings(selectedToken, advancedInfo) {
+  if (!selectedToken) {
+    return []
+  }
+
+  const warnings = []
+
+  if (selectedToken.communityRecognized === false) {
+    warnings.push({
+      code: 'token-not-community-recognized',
+      message: '该代币未显示为社区认可，后续交易必须以合约地址复核。',
+    })
+  }
+
+  const liquidity = parseNumberish(selectedToken.liquidityUsd)
+
+  if (Number.isFinite(liquidity) && liquidity < 10000) {
+    warnings.push({
+      code: liquidity < 1000 ? 'very-low-liquidity' : 'low-liquidity',
+      message:
+        liquidity < 1000
+          ? 'OKX 搜索结果显示流动性低于 1,000 美元，交易可能产生严重滑点。'
+          : 'OKX 搜索结果显示流动性低于 10,000 美元，交易前需要展示滑点风险。',
+    })
+  }
+
+  const tokenTags = Array.isArray(advancedInfo?.tokenTags)
+    ? advancedInfo.tokenTags
+    : []
+
+  if (tokenTags.includes('honeypot')) {
+    warnings.push({
+      code: 'advanced-info-honeypot-tag',
+      message:
+        'OKX 高级画像返回 honeypot 标签，必须继续执行 OKX Security Token Scan，不能直接进入交易。',
+    })
+  }
+
+  if (tokenTags.includes('lowLiquidity')) {
+    warnings.push({
+      code: 'advanced-info-low-liquidity-tag',
+      message: 'OKX 高级画像返回低流动性标签，交易卡片必须提示滑点风险。',
+    })
+  }
+
+  if (['4', '5'].includes(normalizeString(advancedInfo?.riskControlLevel))) {
+    warnings.push({
+      code: 'advanced-info-high-risk-control-level',
+      message:
+        'OKX 高级画像返回高风控等级，必须继续执行 OKX Security Token Scan 和用户确认。',
+    })
+  }
+
+  return warnings
+}
+
+function getTokenAnalysisMessage(selection) {
+  if (selection.resolutionStatus === 'not-found') {
+    return 'OKX Token Search 已返回成功结果；当前条件下未找到匹配代币。'
+  }
+
+  if (selection.resolutionStatus === 'multiple-candidates') {
+    return 'OKX Token Search 返回多个候选代币；需要用合约地址确认后再继续。'
+  }
+
+  if (selection.resolutionStatus === 'single-candidate') {
+    return '已通过 OKX Token Search 找到唯一候选代币，并尝试读取高级画像。'
+  }
+
+  return '已通过 OKX Token Search 精确匹配代币，并尝试读取高级画像。'
+}
+
+function sameTokenAddress(left, right) {
+  const normalizedLeft = normalizeString(left)
+  const normalizedRight = normalizeString(right)
+
+  if (!normalizedLeft || !normalizedRight) {
+    return false
+  }
+
+  if (isLikelyTokenAddress(normalizedLeft) && isLikelyTokenAddress(normalizedRight)) {
+    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+  }
+
+  return normalizedLeft === normalizedRight
+}
+
+function parseNumberish(input) {
+  const value = normalizeString(input).replace(/,/g, '')
+  const number = Number(value)
+
+  return Number.isFinite(number) ? number : Number.NaN
 }
 
 function mapSignalListInput(input) {
