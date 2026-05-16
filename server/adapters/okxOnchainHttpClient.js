@@ -439,9 +439,16 @@ function compactObject(input) {
       continue
     }
 
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        output[key] = value
+      }
+
+      continue
+    }
+
     if (
       typeof value === 'object' &&
-      !Array.isArray(value) &&
       Object.keys(value).length > 0
     ) {
       output[key] = value
