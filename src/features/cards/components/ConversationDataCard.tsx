@@ -153,7 +153,7 @@ export function ConversationDataCard({ card }: ConversationDataCardProps) {
               安全授权
             </AppText>
             <AppText color="textSecondary">
-              {getGateDescription(card.status)}
+              {getGateDescription(card)}
             </AppText>
           </View>
         </View>
@@ -200,7 +200,17 @@ export function ConversationDataCard({ card }: ConversationDataCardProps) {
   )
 }
 
-function getGateDescription(status: ConversationCardStatus) {
+function getGateDescription(card: ConversationCard) {
+  if (isRunnerStatusCard(card)) {
+    if (card.status === 'blocked') {
+      return '这是 Agent 预检状态卡。预检被阻止时不会签名、广播或继续执行。'
+    }
+
+    return '这是 Agent 只读预检状态卡。它只读取数据，不代表交易成功，也不会自动动用资产。'
+  }
+
+  const { status } = card
+
   if (status === 'agent-authorized') {
     return '已获得一次授权，Agent 可进入自主执行通道；若后端风控要求授权，会重新提示。'
   }
@@ -385,16 +395,31 @@ function RunnerStatusSummary({
         </View>
         <View style={styles.strategyTitleCopy}>
           <AppText variant="caption" color="goldBright">
-            Agent Runner
+            {display.panelLabel}
           </AppText>
           <AppText variant="section">{display.strategyName}</AppText>
         </View>
         <StatusPill label={display.stateLabel} tone={display.stateTone} />
       </View>
 
+      {display.preflightStats ? (
+        <View style={styles.runnerStatsRow}>
+          {display.preflightStats.map((stat) => (
+            <View key={stat.label} style={styles.runnerStatBlock}>
+              <AppText variant="caption" color="textMuted">
+                {stat.label}
+              </AppText>
+              <AppText variant="data" style={{ color: stat.color }}>
+                {stat.value}
+              </AppText>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.runnerNotice}>
         <AppText variant="caption" color="textMuted">
-          暂停原因
+          {display.noticeLabel}
         </AppText>
         <AppText color="textSecondary">{display.blockReason}</AppText>
       </View>
@@ -644,11 +669,17 @@ function getStrategyDisplay(card: ConversationCard) {
 
 function getRunnerDisplay(card: ConversationCard) {
   const runnerStatus = getRunnerStatusMetadata(card)
-  const steps = readRunnerSteps(runnerStatus)
+  const preflight = getRunnerPreflight(runnerStatus)
+  const steps = preflight
+    ? readRunnerPreflightSteps(preflight)
+    : readRunnerSteps(runnerStatus)
   const stateLabel =
     readString(runnerStatus, 'stateLabel') ??
     getMetricValue(card, 'Agent 状态', '已授权')
   const state = readString(runnerStatus, 'state') ?? 'confirmed'
+  const blockedCount = readNumber(preflight, 'blockedCount') ?? 0
+  const completedCount = readNumber(preflight, 'completedCount') ?? 0
+  const waitingCount = readNumber(preflight, 'waitingCount') ?? 0
 
   return {
     blockReason:
@@ -657,10 +688,33 @@ function getRunnerDisplay(card: ConversationCard) {
     nextStep:
       readString(runnerStatus, 'nextStep') ??
       getMetricValue(card, '下一步', '等待 H Skill Runner。'),
+    noticeLabel: preflight ? '预检结论' : 'Runner 状态',
+    panelLabel: preflight ? 'Agent 预检' : 'Agent Runner',
+    preflightStats: preflight
+      ? [
+          {
+            color: '#18C47C',
+            label: '完成',
+            value: `${completedCount}`,
+          },
+          {
+            color: '#F4D98B',
+            label: '等待',
+            value: `${waitingCount}`,
+          },
+          {
+            color: blockedCount > 0 ? '#FF4D6D' : '#736A83',
+            label: '阻断',
+            value: `${blockedCount}`,
+          },
+        ]
+      : null,
     stateLabel,
     stateTone:
-      state === 'blocked' || stateLabel.includes('暂停')
-        ? ('gold' as const)
+      state === 'blocked' || blockedCount > 0
+        ? ('danger' as const)
+        : preflight && waitingCount === 0
+          ? ('success' as const)
         : ('purple' as const),
     steps:
       steps.length > 0
@@ -783,6 +837,12 @@ function getRunnerStatusMetadata(card: ConversationCard) {
   return isRecord(runnerStatus) ? runnerStatus : null
 }
 
+function getRunnerPreflight(source: Record<string, unknown> | null) {
+  const preflight = source?.preflight
+
+  return isRecord(preflight) ? preflight : null
+}
+
 function getPipelineMetadata(card: ConversationCard) {
   const pipeline = card.metadata?.pipeline
 
@@ -857,6 +917,62 @@ function readRunnerSteps(source: Record<string, unknown> | null) {
         statusLabel: getRunnerStepStatusLabel(status),
       }
     })
+}
+
+function readRunnerPreflightSteps(source: Record<string, unknown> | null) {
+  const value = source?.results
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter(isRecord)
+    .slice(0, 6)
+    .map((step, index) => {
+      const status = readString(step, 'status') ?? 'waiting'
+
+      return {
+        color: getPreflightStepColor(status),
+        detail: simplifyPreflightDetail(readString(step, 'message')),
+        id: readString(step, 'wrapperId') ?? `preflight-step-${index}`,
+        label: readString(step, 'stage') ?? `预检 ${index + 1}`,
+        statusLabel: getPreflightStepStatusLabel(status),
+      }
+    })
+}
+
+function simplifyPreflightDetail(input: string | undefined) {
+  if (!input) {
+    return '等待 Agent Runner 更新。'
+  }
+
+  return input
+    .replace('H Wallet ', '')
+    .replace('OKX ', 'OKX ')
+    .replace('；这是编排计划，不执行资产动作。', '，不会执行资产动作。')
+}
+
+function getPreflightStepColor(status: string) {
+  if (status === 'completed') {
+    return '#18C47C'
+  }
+
+  if (status === 'blocked') {
+    return '#FF4D6D'
+  }
+
+  return '#F4D98B'
+}
+
+function getPreflightStepStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    blocked: '暂停',
+    completed: '完成',
+    waiting: '等待',
+  }
+
+  return labels[status] ?? status
 }
 
 function getRunnerStepColor(status: string) {
@@ -1144,6 +1260,24 @@ function createStyles(appTheme: AppTheme) {
         ? 'rgba(5, 4, 10, 0.3)'
         : 'rgba(255, 255, 255, 0.62)',
     padding: theme.spacing.md,
+  },
+  runnerStatsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  runnerStatBlock: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: appTheme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(5, 4, 10, 0.32)'
+        : 'rgba(255, 255, 255, 0.66)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
   },
   runnerTimeline: {
     gap: theme.spacing.md,

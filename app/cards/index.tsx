@@ -28,6 +28,7 @@ import type {
 type CardFilter = 'all' | 'confirm' | 'completed' | 'wallet' | 'insight'
 type CardFilterV2 =
   | CardFilter
+  | 'agent'
   | 'receipt'
   | 'task'
   | 'verified'
@@ -54,6 +55,7 @@ const filters: Array<{
   label: string
 }> = [
   { key: 'all', label: '全部' },
+  { key: 'agent', label: 'Agent' },
   { key: 'confirm', label: '待授权' },
   { key: 'receipt', label: '回执' },
   { key: 'wallet', label: '钱包' },
@@ -257,6 +259,16 @@ function getFilteredCards(cards: ConversationCard[], filter: CardFilterV2) {
 
   if (filter === 'completed') {
     return cards.filter((card) => card.status === 'completed')
+  }
+
+  if (filter === 'agent') {
+    return cards.filter((card) =>
+      card.tags.some((tag) =>
+        ['agent', 'earning-agent', 'official-strategy', 'runner-status'].includes(
+          tag,
+        ),
+      ),
+    )
   }
 
   if (filter === 'receipt') {
