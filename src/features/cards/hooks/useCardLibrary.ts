@@ -14,6 +14,8 @@ import {
   getCardLibrary,
   getCardLibraryStats,
   prepareConversationCardForConfirmation,
+  recordTradeExecutionHandoff,
+  verifyTradeResult,
 } from '../../../services/cards/cardLibraryService'
 import type { CardLibraryStats } from '../../../services/cards/types'
 
@@ -150,6 +152,28 @@ export function useConfirmConversationCard() {
 
   return useMutation({
     mutationFn: confirmConversationCard,
+    onSuccess() {
+      invalidateCardStateQueries(queryClient)
+    },
+  })
+}
+
+export function useRecordTradeExecutionHandoff() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: recordTradeExecutionHandoff,
+    onSuccess() {
+      invalidateCardStateQueries(queryClient)
+    },
+  })
+}
+
+export function useVerifyTradeResult() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: verifyTradeResult,
     onSuccess() {
       invalidateCardStateQueries(queryClient)
     },

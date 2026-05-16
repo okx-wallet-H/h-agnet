@@ -3,6 +3,10 @@ import type {
   CardConfirmationResult,
   CardLibraryStats,
   ConversationCard,
+  TradeExecutionHandoffInput,
+  TradeExecutionHandoffResult,
+  TradeResultVerificationInput,
+  TradeResultVerificationResult,
 } from './types'
 
 export type CreateConversationCardInput = Omit<
@@ -20,6 +24,14 @@ export type CardLibraryApi = {
   archiveCard: (cardId: string) => Promise<{ archived: boolean }>
   prepareCardForConfirmation: (cardId: string) => Promise<ConversationCard>
   confirmCard: (cardId: string) => Promise<CardConfirmationResult>
+  recordTradeExecutionHandoff: (
+    cardId: string,
+    input: TradeExecutionHandoffInput,
+  ) => Promise<TradeExecutionHandoffResult>
+  verifyTradeResult: (
+    cardId: string,
+    input?: TradeResultVerificationInput,
+  ) => Promise<TradeResultVerificationResult>
 }
 
 export const cardLibraryApi: CardLibraryApi = {
@@ -51,6 +63,18 @@ export const cardLibraryApi: CardLibraryApi = {
   confirmCard(cardId) {
     return apiRequest(`/cards/${cardId}/confirm`, {
       method: 'POST',
+    })
+  },
+  recordTradeExecutionHandoff(cardId, input) {
+    return apiRequest(`/cards/${cardId}/execution-handoff`, {
+      method: 'POST',
+      body: input,
+    })
+  },
+  verifyTradeResult(cardId, input = {}) {
+    return apiRequest(`/cards/${cardId}/verify-trade`, {
+      method: 'POST',
+      body: input,
     })
   },
 }

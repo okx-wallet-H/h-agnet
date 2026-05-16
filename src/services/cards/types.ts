@@ -75,6 +75,46 @@ export type CardConfirmationResult = {
   } | null
 }
 
+export type TradeExecutionHandoffInput = {
+  chain?: string
+  chainIndex?: string
+  executor?: string
+  isFromMyProject?: boolean
+  provider?: string
+  txHash: string
+}
+
+export type TradeExecutionHandoff = {
+  chain?: string
+  chainIndex?: string
+  executor: string
+  isFromMyProject: boolean
+  provider: string
+  receivedAt: string
+  status: 'broadcasted'
+  txHash: string
+}
+
+export type TradeExecutionHandoffResult = {
+  card: ConversationCard
+  execution: TradeExecutionHandoff
+  status: 'recorded' | 'already-recorded'
+}
+
+export type TradeResultVerificationInput = {
+  chain?: string
+  chainIndex?: string
+  isFromMyProject?: boolean
+  txHash?: string
+}
+
+export type TradeResultVerificationResult = {
+  card: ConversationCard
+  status: 'success' | 'pending' | 'fail' | 'unverified'
+  successCard: ConversationCard | null
+  tracking: Record<string, unknown> | null
+}
+
 export type CardLibraryStats = {
   totalCards: number
   activeCards: number
