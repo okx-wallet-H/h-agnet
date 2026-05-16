@@ -817,6 +817,7 @@ function confirmCardReview(cardId) {
 function createConfirmationResult(card) {
   const authorizationGrant = applyAuthorizationGrantFromCard(card)
   const runnerStatus = syncStrategyRunAfterAuthorization(card, authorizationGrant)
+  syncRelatedStrategyCardsAfterAuthorization(card, authorizationGrant)
 
   return {
     authorizationGrant,
@@ -824,6 +825,50 @@ function createConfirmationResult(card) {
     receiptCard: createExecutionReceiptCard(card, { runnerStatus }),
     runnerStatus,
   }
+}
+
+function syncRelatedStrategyCardsAfterAuthorization(card, authorizationGrant) {
+  if (!isOfficialStrategyCard(card) || !authorizationGrant || !card.userId) {
+    return
+  }
+
+  const authorizationScope = getMetadataString(card, 'authorizationScope')
+
+  if (!authorizationScope) {
+    return
+  }
+
+  cardRepository
+    .list({ userId: card.userId })
+    .filter(
+      (candidate) =>
+        candidate.id !== card.id &&
+        isOfficialStrategyCard(candidate) &&
+        getMetadataString(candidate, 'authorizationScope') ===
+          authorizationScope &&
+        ['draft', 'requires-confirmation'].includes(candidate.status),
+    )
+    .forEach((candidate) => {
+      const agentAuthorization =
+        candidate.metadata?.agentAuthorization &&
+        typeof candidate.metadata.agentAuthorization === 'object' &&
+        !Array.isArray(candidate.metadata.agentAuthorization)
+          ? candidate.metadata.agentAuthorization
+          : {}
+
+      candidate.metadata = {
+        ...candidate.metadata,
+        agentAuthorization: {
+          ...agentAuthorization,
+          authorizationGrantId: authorizationGrant.id,
+          authorizationStatus: 'agent-authorized',
+          policyReason: '该官方赚币策略已完成授权，可进入 Agent 自主执行通道。',
+          scope: authorizationScope,
+        },
+        authorizationStatus: 'agent-authorized',
+      }
+      updateCardStatus(candidate, 'agent-authorized')
+    })
 }
 
 module.exports = {

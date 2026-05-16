@@ -97,7 +97,7 @@ function getOfficialStrategyPlan(input) {
 
 function getAgentRunnerStatus() {
   const runs = strategySkillRepository.listRuns()
-  const currentRun = runs[0] ?? null
+  const currentRun = selectCurrentStrategyRun(runs)
 
   return {
     state: currentRun?.status ?? 'idle',
@@ -111,6 +111,39 @@ function getAgentRunnerStatus() {
       reason: '当前阶段只开放 Runner 合约、策略注册表和启动草案。',
     },
   }
+}
+
+function selectCurrentStrategyRun(runs) {
+  return (
+    [...runs].sort((firstRun, secondRun) => {
+      const statusDiff =
+        getRunDisplayPriority(firstRun.status) -
+        getRunDisplayPriority(secondRun.status)
+
+      if (statusDiff !== 0) {
+        return statusDiff
+      }
+
+      return (
+        new Date(secondRun.updatedAt ?? secondRun.createdAt).getTime() -
+        new Date(firstRun.updatedAt ?? firstRun.createdAt).getTime()
+      )
+    })[0] ?? null
+  )
+}
+
+function getRunDisplayPriority(status) {
+  const priorities = {
+    executing: 1,
+    planning: 2,
+    blocked: 3,
+    completed: 4,
+    paused: 5,
+    'waiting-authorization': 6,
+    starting: 7,
+  }
+
+  return priorities[status] ?? 99
 }
 
 function startOfficialStrategySkill(input) {

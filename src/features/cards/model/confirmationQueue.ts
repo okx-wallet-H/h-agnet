@@ -38,7 +38,27 @@ export function isAuthorizationFlowCard(card: ConversationCard) {
 }
 
 export function getConfirmationQueueCards(cards: ConversationCard[]) {
-  return cards.filter(isConfirmationQueueCard)
+  const authorizedScopes = new Set(
+    cards
+      .filter(isAuthorizedStrategyCard)
+      .map(getAuthorizationScope)
+      .filter((scope): scope is string => Boolean(scope)),
+  )
+
+  return cards.filter((card) => {
+    if (!isConfirmationQueueCard(card)) {
+      return false
+    }
+
+    if (
+      ['draft', 'requires-confirmation'].includes(card.status) &&
+      authorizedScopes.has(getAuthorizationScope(card) ?? '')
+    ) {
+      return false
+    }
+
+    return true
+  })
 }
 
 export function getConfirmationQueueStats(cards: ConversationCard[]) {
@@ -101,6 +121,30 @@ function getAuthorizationStatus(card: ConversationCard) {
   }
 
   return readString(agentAuthorization.authorizationStatus)
+}
+
+function getAuthorizationScope(card: ConversationCard) {
+  const directScope = readString(card.metadata?.authorizationScope)
+
+  if (directScope) {
+    return directScope
+  }
+
+  const agentAuthorization = card.metadata?.agentAuthorization
+
+  if (!isRecord(agentAuthorization)) {
+    return null
+  }
+
+  return readString(agentAuthorization.scope)
+}
+
+function isAuthorizedStrategyCard(card: ConversationCard) {
+  return (
+    card.tags.includes('official-strategy') &&
+    ['agent-authorized', 'confirmed', 'pending-execution'].includes(card.status) &&
+    Boolean(getAuthorizationScope(card))
+  )
 }
 
 function readString(value: unknown) {
