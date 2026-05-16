@@ -19,6 +19,24 @@ Agent Wallet
 → Card Library
 ```
 
+H Wallet strategies are OKX skill compositions. H Wallet owns the product
+strategy, execution order, authorization scope, risk gates, and Chinese card
+templates. OKX OnchainOS skills own the underlying capabilities such as wallet
+portfolio, DEX signals, token analysis, Swap quote, security scan, simulation,
+gateway tracking, and DeFi actions.
+
+```txt
+H.strategy.official.*
+→ H Skill Wrapper sequence
+→ OKX skill composition
+→ normalized step results
+→ review / progress / result cards
+```
+
+Do not expose raw OKX skill names as user commands. The user starts an H Wallet
+strategy such as `启动稳健稳定币赚币 Agent`; the strategy registry decides which
+OKX skills are composed behind that product action.
+
 ## Strategy Skill Principle
 
 Strategies are dynamic product assets, not frontend logic.
@@ -66,6 +84,7 @@ Every strategy skill declares:
 * risk level
 * supported chains and assets
 * required H Skill wrappers
+* OKX skill composition generated from those wrappers
 * authorization scope
 * stop conditions
 * card templates
@@ -100,6 +119,19 @@ POST /api/h/v1/agent/skill-runtime/invoke
 
 Dry-run validates wrapper identity, records an invocation, and returns a blocked
 result. It does not call OKX, OnchainOS, wallets, or provider APIs.
+
+The first strategy-composition wrappers are:
+
+```txt
+H.skill.strategy.composePlan      → okx-dex-strategy
+H.skill.signal.readOnchainSignals → okx-dex-signal
+H.skill.token.analyzeRisk         → okx-dex-token
+H.skill.market.readDexTrends      → okx-dex-market
+```
+
+These are strategy inputs and planning helpers. They must not execute asset
+actions directly. Any asset-changing step still goes through swap, gateway,
+DeFi, risk, authorization, and verified result gates.
 
 The first read-only invoke target is `H.skill.wallet.getPortfolio`. It maps to
 `okx-agentic-wallet` / `onchainos wallet balance` because it reads the current

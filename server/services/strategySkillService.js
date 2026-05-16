@@ -53,7 +53,9 @@ const runnerStates = [
 ]
 
 function listOfficialStrategySkills() {
-  return strategySkillRepository.listOfficialStrategies()
+  return strategySkillRepository
+    .listOfficialStrategies()
+    .map(enrichStrategyWithOkxSkillComposition)
 }
 
 function listHSkillWrappers() {
@@ -66,7 +68,9 @@ function listStrategyRuns() {
 
 function getOfficialStrategyPlan(input) {
   const strategyId = validateStrategyId(input?.strategyId)
-  const strategy = strategySkillRepository.findStrategyById(strategyId)
+  const strategy = enrichStrategyWithOkxSkillComposition(
+    strategySkillRepository.findStrategyById(strategyId),
+  )
 
   if (!strategy) {
     const error = new Error('策略不存在或未开放。')
@@ -76,10 +80,13 @@ function getOfficialStrategyPlan(input) {
   }
 
   const plan = buildStrategyExecutionPlan(strategy)
+  const composition = buildOkxSkillComposition(strategy)
 
   return {
     strategy,
+    composition,
     plan,
+    compositionSummary: summarizeOkxSkillComposition(composition),
     summary: summarizeExecutionPlan(plan),
     executionPolicy: {
       realExecutionEnabled: false,
@@ -108,7 +115,9 @@ function getAgentRunnerStatus() {
 
 function startOfficialStrategySkill(input) {
   const strategyId = validateStrategyId(input?.strategyId)
-  const strategy = strategySkillRepository.findStrategyById(strategyId)
+  const strategy = enrichStrategyWithOkxSkillComposition(
+    strategySkillRepository.findStrategyById(strategyId),
+  )
 
   if (!strategy) {
     const error = new Error('策略不存在或未开放。')
@@ -118,6 +127,7 @@ function startOfficialStrategySkill(input) {
   }
 
   const executionPlan = buildStrategyExecutionPlan(strategy)
+  const okxSkillComposition = buildOkxSkillComposition(strategy)
   const authorization = evaluateAgentAuthorization({
     requiresAssetAction: true,
     scope: strategy.authorizationScope,
@@ -139,6 +149,7 @@ function startOfficialStrategySkill(input) {
     executionMode: 'draft-only',
     requiredSkillWrappers: strategy.requiredSkillWrappers,
     executionPlan,
+    okxSkillComposition,
     authorization,
     stateLabel: getRunStateLabel(runStatus),
     blockReason: getRunBlockReason({ authorization, executionPlan }),
@@ -227,12 +238,14 @@ function startOfficialStrategySkill(input) {
       supportedAssets: strategy.supportedAssets,
       supportedChains: strategy.supportedChains,
       requiredSkillWrappers: strategy.requiredSkillWrappers,
+      okxSkillComposition,
     },
     tags: [
       'agent',
       'earning-agent',
       'official-strategy',
       'strategy-skill',
+      'okx-skill-composition',
       `strategy:${strategy.id}`,
       `run:${run.id}`,
     ],
@@ -254,6 +267,50 @@ function getRunStateLabel(status) {
   }
 
   return labels[status] ?? status
+}
+
+function enrichStrategyWithOkxSkillComposition(strategy) {
+  if (!strategy) {
+    return strategy
+  }
+
+  return {
+    ...strategy,
+    compositionMode: 'okx-skill-composition',
+    strategyOwner: 'H Wallet',
+    capabilityOwner: 'OKX OnchainOS',
+    okxSkillComposition: buildOkxSkillComposition(strategy),
+  }
+}
+
+function buildOkxSkillComposition(strategy) {
+  return strategy.requiredSkillWrappers.map((wrapperId, index) => {
+    const wrapper = strategySkillRepository.findHSkillWrapperById(wrapperId)
+    const binding = wrapper ? getHSkillBindingStatus(wrapper) : null
+
+    return {
+      id: `okx-composition-step-${index + 1}`,
+      order: index + 1,
+      phase: inferCompositionPhase(wrapperId),
+      hSkillWrapperId: wrapperId,
+      hSkillWrapperLabel: wrapper?.label ?? '未注册 H Skill Wrapper',
+      okxSkill: wrapper?.providerSkill ?? 'unknown',
+      okxSkillRole: inferOkxSkillRole(wrapperId),
+      providerStatus: binding?.adapterStatus ?? 'unknown',
+      bindingStatus: binding?.status ?? 'blocked',
+      userVisibleMode: inferUserVisibleMode(wrapperId),
+      rule:
+        'H Wallet 负责策略顺序、授权范围、风控门和卡片语义；OKX skill 负责底层能力输出。',
+    }
+  })
+}
+
+function summarizeOkxSkillComposition(composition) {
+  const okxSkillCount = new Set(
+    composition.map((item) => item.okxSkill).filter(Boolean),
+  ).size
+
+  return `该策略由 ${composition.length} 个 H Skill Wrapper 编排，组合 ${okxSkillCount} 个 OKX OnchainOS skill。`
 }
 
 function buildStrategyExecutionPlan(strategy) {
@@ -336,6 +393,10 @@ function getRunBlockReason({ authorization, executionPlan }) {
 function inferExecutionStage(wrapperId) {
   const stageLabels = {
     'H.skill.wallet.getPortfolio': '读取钱包',
+    'H.skill.strategy.composePlan': '策略组合',
+    'H.skill.signal.readOnchainSignals': '链上信号',
+    'H.skill.token.analyzeRisk': '代币画像',
+    'H.skill.market.readDexTrends': '市场趋势',
     'H.skill.swap.quote': 'OKX Swap 报价',
     'H.skill.swap.execute': 'OKX Swap 执行',
     'H.skill.risk.scanTransaction': '风控扫描',
@@ -347,6 +408,58 @@ function inferExecutionStage(wrapperId) {
   }
 
   return stageLabels[wrapperId] ?? '封装能力'
+}
+
+function inferCompositionPhase(wrapperId) {
+  const phaseMap = {
+    'H.skill.strategy.composePlan': 'strategy-planning',
+    'H.skill.wallet.getPortfolio': 'wallet-context',
+    'H.skill.signal.readOnchainSignals': 'signal-input',
+    'H.skill.token.analyzeRisk': 'risk-input',
+    'H.skill.market.readDexTrends': 'market-input',
+    'H.skill.swap.quote': 'quote',
+    'H.skill.swap.execute': 'execution',
+    'H.skill.risk.scanTransaction': 'risk-gate',
+    'H.skill.gateway.simulate': 'simulation-gate',
+    'H.skill.gateway.broadcast': 'broadcast',
+    'H.skill.gateway.trackOrder': 'verification',
+    'H.skill.defi.deposit': 'earning-action',
+    'H.skill.defi.claim': 'earning-action',
+  }
+
+  return phaseMap[wrapperId] ?? 'provider-capability'
+}
+
+function inferOkxSkillRole(wrapperId) {
+  const roleMap = {
+    'H.skill.strategy.composePlan': '把 OKX skill 能力组合成 H Wallet 策略步骤。',
+    'H.skill.wallet.getPortfolio': '读取 Agent Wallet 资产上下文。',
+    'H.skill.signal.readOnchainSignals': '提供链上信号输入，不直接下单。',
+    'H.skill.token.analyzeRisk': '提供 token 画像和风险输入。',
+    'H.skill.market.readDexTrends': '提供 DEX 市场趋势输入。',
+    'H.skill.swap.quote': '提供 OKX Swap 报价和路线。',
+    'H.skill.swap.execute': '提供 OKX Swap 交易数据和执行能力。',
+    'H.skill.risk.scanTransaction': '提供交易、签名和 token 风险扫描。',
+    'H.skill.gateway.simulate': '提供交易模拟和 gas 预检。',
+    'H.skill.gateway.broadcast': '提供链上广播能力。',
+    'H.skill.gateway.trackOrder': '提供交易状态追踪。',
+    'H.skill.defi.deposit': '提供 DeFi 存入能力。',
+    'H.skill.defi.claim': '提供收益领取能力。',
+  }
+
+  return roleMap[wrapperId] ?? '提供 OKX OnchainOS 能力。'
+}
+
+function inferUserVisibleMode(wrapperId) {
+  const visibleWrappers = new Set([
+    'H.skill.swap.quote',
+    'H.skill.swap.execute',
+    'H.skill.defi.deposit',
+    'H.skill.defi.claim',
+    'H.skill.gateway.trackOrder',
+  ])
+
+  return visibleWrappers.has(wrapperId) ? 'card-output' : 'collapsible-process'
 }
 
 function validateStrategyId(input) {

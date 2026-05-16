@@ -17,6 +17,10 @@ export function formatOfficialStrategyName(strategyId: string) {
 export function formatHSkillName(wrapperId: string) {
   const labels: Record<string, string> = {
     'H.skill.wallet.getPortfolio': '读取钱包资产',
+    'H.skill.strategy.composePlan': '组合 OKX 策略计划',
+    'H.skill.signal.readOnchainSignals': '读取链上信号',
+    'H.skill.token.analyzeRisk': '分析代币画像',
+    'H.skill.market.readDexTrends': '读取市场趋势',
     'H.skill.swap.quote': '获取 Swap 报价',
     'H.skill.swap.execute': '执行 OKX Swap',
     'H.skill.risk.scanTransaction': '交易风险扫描',

@@ -24,6 +24,42 @@ const hSkillWrappers = [
     description: '真实执行必须等待授权、风控、模拟和执行回执链路完成。',
   },
   {
+    id: 'H.skill.strategy.composePlan',
+    domain: 'onchain',
+    label: '组合 OKX 策略计划',
+    providerSkill: 'okx-dex-strategy',
+    status: 'contract-ready',
+    description:
+      '把 H Wallet 官方策略目标拆成 OKX skill 调用顺序、授权范围和卡片输出计划。',
+  },
+  {
+    id: 'H.skill.signal.readOnchainSignals',
+    domain: 'onchain',
+    label: '读取链上信号',
+    providerSkill: 'okx-dex-signal',
+    status: 'contract-ready',
+    description:
+      '读取聪明钱、鲸鱼、KOL 或聚合链上信号，作为策略观察输入，不直接执行交易。',
+  },
+  {
+    id: 'H.skill.token.analyzeRisk',
+    domain: 'onchain',
+    label: '分析代币画像',
+    providerSkill: 'okx-dex-token',
+    status: 'contract-ready',
+    description:
+      '分析 token 热度、持仓集中度、风险标签和链上交易画像，作为策略风控输入。',
+  },
+  {
+    id: 'H.skill.market.readDexTrends',
+    domain: 'onchain',
+    label: '读取 DEX 市场趋势',
+    providerSkill: 'okx-dex-market',
+    status: 'contract-ready',
+    description:
+      '读取 DEX 行情、K 线或市场趋势数据，作为策略观察输入，不直接执行交易。',
+  },
+  {
     id: 'H.skill.risk.scanTransaction',
     domain: 'onchain',
     label: '交易风险扫描',
@@ -85,7 +121,9 @@ const officialStrategySkills = [
     supportedChains: ['X Layer', 'Ethereum', 'Base'],
     supportedAssets: ['USDT', 'USDC'],
     requiredSkillWrappers: [
+      'H.skill.strategy.composePlan',
       'H.skill.wallet.getPortfolio',
+      'H.skill.market.readDexTrends',
       'H.skill.risk.scanTransaction',
       'H.skill.gateway.simulate',
       'H.skill.defi.deposit',
@@ -115,7 +153,10 @@ const officialStrategySkills = [
     supportedChains: ['X Layer', 'Ethereum', 'Base', 'Solana'],
     supportedAssets: ['ETH', 'BTC', 'USDT', 'USDC', 'SOL'],
     requiredSkillWrappers: [
+      'H.skill.strategy.composePlan',
       'H.skill.wallet.getPortfolio',
+      'H.skill.signal.readOnchainSignals',
+      'H.skill.token.analyzeRisk',
       'H.skill.swap.quote',
       'H.skill.risk.scanTransaction',
       'H.skill.gateway.simulate',

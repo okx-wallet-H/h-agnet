@@ -141,6 +141,21 @@ stop an Agent, but the frontend must not invent strategy logic, token routing,
 or DeFi execution rules. Strategy execution belongs behind backend service and
 adapter layers.
 
+H Wallet strategies are composed from OKX OnchainOS skills. OKX provides the
+capability layer; H Wallet owns strategy packaging, Chinese card UX,
+authorization policy, stop conditions, and Card Library indexing.
+
+```txt
+H Wallet official strategy
+→ ordered H Skill Wrapper sequence
+→ OKX skill composition
+→ normalized provider outputs
+→ card / audit / scoring records
+```
+
+The user-facing command remains simple, for example `启动稳健稳定币赚币 Agent`.
+The app should not ask low-cognition users to choose raw OKX skills.
+
 Strategies are dynamic and versioned. H Wallet should treat them as managed
 backend records, not as hardcoded app screens.
 

@@ -54,6 +54,20 @@ export type AgentExecutionPlanStep = {
   wrapperStatus?: HSkillWrapperStatus
 }
 
+export type OkxSkillCompositionStep = {
+  id: string
+  order: number
+  phase: string
+  hSkillWrapperId: string
+  hSkillWrapperLabel: string
+  okxSkill: string
+  okxSkillRole: string
+  providerStatus: string
+  bindingStatus: 'ready' | 'blocked' | 'unknown'
+  userVisibleMode: 'card-output' | 'collapsible-process'
+  rule: string
+}
+
 export type AgentAuthorizationStatus =
   | 'agent-authorized'
   | 'authorization-required'
@@ -158,6 +172,10 @@ export type OfficialStrategySkill = {
   supportedChains: string[]
   supportedAssets: string[]
   requiredSkillWrappers: string[]
+  compositionMode?: 'okx-skill-composition'
+  strategyOwner?: 'H Wallet'
+  capabilityOwner?: 'OKX OnchainOS'
+  okxSkillComposition?: OkxSkillCompositionStep[]
   authorizationScope: string
   stopConditions: string[]
   cardTemplates: {
@@ -176,6 +194,7 @@ export type StrategyRun = {
   executionMode: 'draft-only'
   requiredSkillWrappers: string[]
   executionPlan: AgentExecutionPlanStep[]
+  okxSkillComposition?: OkxSkillCompositionStep[]
   authorization: AgentAuthorizationResult
   stateLabel: string
   blockReason?: string
@@ -202,7 +221,9 @@ export type AgentRunnerStatus = {
 
 export type StrategyPlanResult = {
   strategy: OfficialStrategySkill
+  composition?: OkxSkillCompositionStep[]
   plan: AgentExecutionPlanStep[]
+  compositionSummary?: string
   summary: string
   executionPolicy: {
     realExecutionEnabled: boolean
