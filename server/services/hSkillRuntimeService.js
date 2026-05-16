@@ -1604,6 +1604,7 @@ function normalizeOkxHotTokenTrend(row, index) {
       'priceChange24h',
       'changePercent',
       'priceChange',
+      'change',
     ]),
     volumeUsd: pickFirst(row, [
       'volumeUsd',
@@ -1615,13 +1616,23 @@ function normalizeOkxHotTokenTrend(row, index) {
     liquidityUsd: pickFirst(row, ['liquidityUsd', 'liquidity']),
     marketCapUsd: pickFirst(row, ['marketCapUsd', 'marketCap']),
     holderCount: pickFirst(row, ['holderCount', 'holders']),
+    inflowUsd: pickFirst(row, ['inflowUsd', 'netInflowUsd']),
+    firstTradeTime: pickFirst(row, ['firstTradeTime']),
+    tokenLogoUrl: pickFirst(row, ['tokenLogoUrl', 'logoUrl']),
+    top10HoldPercent: pickFirst(row, ['top10HoldPercent']),
+    txBuyCount: pickFirst(row, ['txsBuy', 'txBuyCount']),
+    txSellCount: pickFirst(row, ['txsSell', 'txSellCount']),
     transactionCount: pickFirst(row, ['transactionCount', 'txCount', 'txs']),
     uniqueTraderCount: pickFirst(row, [
       'uniqueTraderCount',
       'uniqueTrader',
       'uniqueTraders',
     ]),
-    riskControlLevel: pickFirst(row, ['riskControlLevel', 'riskLevel']),
+    riskControlLevel: pickFirst(row, [
+      'riskControlLevel',
+      'riskLevelControl',
+      'riskLevel',
+    ]),
     tags: pickFirst(row, ['tokenTags', 'tags']),
   })
 }
