@@ -62,11 +62,13 @@ async function sendAgentConversationMessage(input) {
 }
 
 function listAgentConversationMessages() {
-  return agentConversationRepository.listMessages()
+  return agentConversationRepository.listMessages({ userId: getCurrentUserId() })
 }
 
 function listAgentConversationTurns() {
-  return agentConversationRepository.listTurns().map(hydrateTurn)
+  return agentConversationRepository
+    .listTurns({ userId: getCurrentUserId() })
+    .map(hydrateTurn)
 }
 
 function attachCardToConversationTurn(parentCardId, card) {

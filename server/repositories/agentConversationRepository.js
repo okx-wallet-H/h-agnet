@@ -13,8 +13,9 @@ function createAgentConversationRepository() {
     },
     findTurnByCardId(cardId) {
       return (
-        turns.find((turn) => Array.isArray(turn.cardIds) && turn.cardIds.includes(cardId)) ??
-        null
+        turns.find(
+          (turn) => Array.isArray(turn.cardIds) && turn.cardIds.includes(cardId),
+        ) ?? null
       )
     },
     hydrate(nextMessages = [], nextTurns = []) {
@@ -33,16 +34,30 @@ function createAgentConversationRepository() {
 
       return turn
     },
-    listMessages() {
+    listMessages({ userId } = {}) {
+      if (userId !== undefined) {
+        return messages.filter(
+          (message) => normalizeUserId(message.userId) === userId,
+        )
+      }
+
       return [...messages]
     },
-    listTurns() {
+    listTurns({ userId } = {}) {
+      if (userId !== undefined) {
+        return turns.filter((turn) => normalizeUserId(turn.userId) === userId)
+      }
+
       return [...turns]
     },
     persistTurn(turn) {
       persistAgentConversationTurn(turn)
     },
   }
+}
+
+function normalizeUserId(userId) {
+  return typeof userId === 'string' && userId.length > 0 ? userId : null
 }
 
 module.exports = {

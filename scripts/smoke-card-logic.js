@@ -21,6 +21,7 @@ const {
 } = require('../server/services/cardsService')
 const {
   attachCardToConversationTurn,
+  listAgentConversationMessages,
   listAgentConversationTurns,
   sendAgentConversationMessage,
 } = require('../server/services/agentConversationService')
@@ -41,6 +42,7 @@ async function main() {
   const conversationBoundary = await smokeConversationBoundary()
   const clientCardBoundary = smokeClientCardBoundary()
   const cardOwnershipBoundary = await smokeCardOwnershipBoundary()
+  const conversationOwnershipBoundary = await smokeConversationOwnershipBoundary()
   const conversationTurnLinking = await smokeConversationTurnLinking()
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
@@ -54,6 +56,7 @@ async function main() {
         cardOwnershipBoundary,
         clientCardBoundary,
         conversationBoundary,
+        conversationOwnershipBoundary,
         conversationTurnLinking,
         executionHandoff,
         verificationBoundary,
@@ -110,6 +113,45 @@ async function smokeCardOwnershipBoundary() {
     blockedCrossUserArchive: true,
     blockedCrossUserVerify: true,
     currentUserId: owner.id,
+  }
+}
+
+async function smokeConversationOwnershipBoundary() {
+  const firstUser = resetMemoryState()
+
+  await sendAgentConversationMessage({
+    content: '第一位用户的记录。',
+  })
+
+  const secondUser = userRepository.upsertByEmail('smoke-second@h-wallet.local', {
+    displayName: 'Smoke Second User',
+    status: 'active',
+  })
+  userRepository.setCurrentUserId(secondUser.id)
+
+  await sendAgentConversationMessage({
+    content: '第二位用户的记录。',
+  })
+
+  assert.equal(listAgentConversationTurns().length, 1)
+  assert.equal(listAgentConversationMessages().length, 2)
+  assert.equal(
+    listAgentConversationTurns()[0].userMessage.content,
+    '第二位用户的记录。',
+  )
+
+  userRepository.setCurrentUserId(firstUser.id)
+
+  assert.equal(listAgentConversationTurns().length, 1)
+  assert.equal(listAgentConversationMessages().length, 2)
+  assert.equal(
+    listAgentConversationTurns()[0].userMessage.content,
+    '第一位用户的记录。',
+  )
+
+  return {
+    firstUserTurns: 1,
+    secondUserTurns: 1,
   }
 }
 
