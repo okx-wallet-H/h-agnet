@@ -53,6 +53,10 @@ const runnerStates = [
   },
 ]
 
+function nowIso() {
+  return new Date().toISOString()
+}
+
 function listOfficialStrategySkills() {
   return strategySkillRepository
     .listOfficialStrategies()
