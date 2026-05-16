@@ -9,6 +9,7 @@ const {
 } = require('../repositories/strategySkillRepository')
 
 const cardTypes = new Set([
+  'wallet-created',
   'wallet-confirmation',
   'trade-confirmation',
   'trade-success',
@@ -55,12 +56,14 @@ const confirmationCardTypes = new Set([
 ])
 
 const walletActionCardTypes = new Set([
+  'wallet-created',
   'wallet-confirmation',
   'recharge-success',
   'withdrawal-success',
 ])
 
 const successCardTypes = new Set([
+  'wallet-created',
   'trade-success',
   'recharge-success',
   'withdrawal-success',
@@ -116,6 +119,89 @@ function updateCardStatus(card, status) {
 
 function getMetricValue(card, label, fallback = '待同步') {
   return card.metrics.find((metric) => metric.label === label)?.value ?? fallback
+}
+
+function createAgentWalletCreatedCard(session) {
+  const walletBindingTag = session.walletBindingId
+    ? `wallet-binding:${session.walletBindingId}`
+    : null
+  const existingCard = walletBindingTag
+    ? cardRepository.findFirst(
+        (card) =>
+          card.type === 'wallet-created' &&
+          card.tags.includes(walletBindingTag),
+      )
+    : null
+
+  if (existingCard) {
+    return existingCard
+  }
+
+  const primaryAddress = session.evmAddress ?? session.solAddress ?? null
+
+  return createCard({
+    type: 'wallet-created',
+    status: 'completed',
+    source: 'wallet-service',
+    userId: session.userId,
+    title: 'Agent 钱包创建成功',
+    summary:
+      '邮箱验证码已通过，OKX Agent Wallet 会话已建立。后续充值、提现、交易和赚币都会通过 H Wallet 卡片继续。',
+    completedAt: nowIso(),
+    metrics: [
+      { label: '登录方式', value: '邮箱验证码', tone: 'gold' },
+      { label: '钱包状态', value: '已登录', tone: 'success' },
+      {
+        label: '账户',
+        value: session.accountName ?? session.accountId ?? '等待同步',
+        tone: session.accountName || session.accountId ? 'gold' : 'muted',
+      },
+      {
+        label: 'EVM 地址',
+        value: shortenAddressMetric(session.evmAddress),
+        tone: session.evmAddress ? 'gold' : 'muted',
+      },
+      {
+        label: 'Solana 地址',
+        value: shortenAddressMetric(session.solAddress),
+        tone: session.solAddress ? 'gold' : 'muted',
+      },
+      { label: '授权策略', value: '一次授权范围', tone: 'gold' },
+      { label: '当前状态', value: '已完成', tone: 'success' },
+    ],
+    metadata: {
+      accountId: session.accountId ?? null,
+      accountName: session.accountName ?? null,
+      email: session.email,
+      evmAddress: session.evmAddress ?? null,
+      loginType: session.loginType ?? 'email',
+      primaryAddress,
+      solAddress: session.solAddress ?? null,
+      walletBindingId: session.walletBindingId ?? null,
+      walletBindingStatus: session.walletBindingStatus ?? null,
+    },
+    tags: [
+      'wallet',
+      'agent-wallet',
+      'wallet-created',
+      'card-library',
+      'verified-session',
+      walletBindingTag,
+      session.accountId ? `account:${session.accountId}` : null,
+    ].filter(Boolean),
+  })
+}
+
+function shortenAddressMetric(address) {
+  if (!address) {
+    return '等待同步'
+  }
+
+  if (address.length <= 18) {
+    return address
+  }
+
+  return `${address.slice(0, 8)}...${address.slice(-8)}`
 }
 
 function findExecutionReceipt(cardId) {
@@ -694,6 +780,7 @@ function createConfirmationResult(card) {
 module.exports = {
   archiveCard,
   confirmCardReview,
+  createAgentWalletCreatedCard,
   createCard,
   getCardLibraryStats,
   listCards,

@@ -12,6 +12,7 @@ import type {
   VerifyAgentWalletOtpInput,
 } from '../../../services/auth/types'
 import { isApiConfigured } from '../../../services/api/httpClient'
+import { cardLibraryKeys } from '../../cards/hooks/useCardLibrary'
 import { walletDataKeys } from '../../wallet/hooks/useWalletData'
 
 export const agentWalletAuthKeys = {
@@ -74,6 +75,9 @@ export function useVerifyAgentWalletOtp() {
       })
       void queryClient.invalidateQueries({
         queryKey: walletDataKeys.all,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: cardLibraryKeys.all,
       })
     },
   })

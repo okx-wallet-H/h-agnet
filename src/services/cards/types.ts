@@ -1,4 +1,5 @@
 export type ConversationCardType =
+  | 'wallet-created'
   | 'wallet-confirmation'
   | 'trade-confirmation'
   | 'trade-success'

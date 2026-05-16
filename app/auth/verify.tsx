@@ -71,6 +71,7 @@ export default function VerifyAgentWalletScreen() {
               email,
               accountId: session.accountId ?? '',
               accountName: session.accountName ?? '',
+              cardId: session.walletCreatedCard?.id ?? '',
               evmAddress: session.evmAddress ?? '',
               solAddress: session.solAddress ?? '',
             },

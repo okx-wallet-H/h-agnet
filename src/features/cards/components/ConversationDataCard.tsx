@@ -41,6 +41,7 @@ const statusTone: Record<
 }
 
 const typeLabel: Record<ConversationCard['type'], string> = {
+  'wallet-created': '钱包创建',
   'wallet-confirmation': '钱包授权',
   'trade-confirmation': '交易授权',
   'trade-success': '交易成功',
@@ -966,6 +967,8 @@ function formatTag(tag: string) {
     confirmation: '授权',
     wallet: '钱包',
     'agent-wallet': 'Agent 钱包',
+    'wallet-created': '创建成功',
+    'verified-session': '已验证',
     boost: '赚币',
     quest: '任务',
     transfer: '转账',

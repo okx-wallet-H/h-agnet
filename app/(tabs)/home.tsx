@@ -39,6 +39,7 @@ import {
   earningAgentExampleCommand,
   earningAgentPrimaryCommand,
 } from '../../src/features/agent/model/earningAgentExperience'
+import { useAgentWalletSession } from '../../src/features/auth/hooks/useAgentWalletAuth'
 import {
   useBoostGrowthSummary,
   useSideQuests,
@@ -96,6 +97,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<HomeMode>('chat')
   const [command, setCommand] = useState('')
   const backendConfigured = isApiConfigured()
+  const walletSession = useAgentWalletSession()
   const turnsQuery = useAgentConversationTurns()
   const sendCommand = useSendAgentConversationMessage()
   const serverTurns = turnsQuery.data ?? []
@@ -109,6 +111,7 @@ export default function HomeScreen() {
     : serverTurns
   const visibleTurns = conversationTurns.slice(-8)
   const hasConversationTurns = visibleTurns.length > 0
+  const walletReady = Boolean(walletSession.data)
   const canSend =
     backendConfigured && command.trim().length > 0 && !sendCommand.isPending
 
@@ -132,7 +135,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <TopNavigation mode={mode} onModeChange={setMode} />
+        <TopNavigation
+          mode={mode}
+          onModeChange={setMode}
+          walletReady={walletReady}
+        />
 
         {mode === 'chat' ? (
           <>
@@ -149,6 +156,8 @@ export default function HomeScreen() {
             </View>
 
             <TrustStrip />
+
+            {!walletReady ? <WalletOnboardingNudge /> : null}
 
             <View style={styles.guideGrid}>
               {guideCards.map((item) => (
@@ -267,9 +276,11 @@ function shouldShowChatCardActions(card: ConversationCard) {
 function TopNavigation({
   mode,
   onModeChange,
+  walletReady,
 }: {
   mode: HomeMode
   onModeChange: (mode: HomeMode) => void
+  walletReady: boolean
 }) {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
@@ -278,10 +289,16 @@ function TopNavigation({
     <View style={styles.topNav}>
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push('/wallet')}
+        onPress={() => router.push(walletReady ? '/wallet' : '/wallet/connect')}
         style={styles.navButton}
       >
         <WalletCards color={appTheme.colors.goldBright} size={20} />
+        <View
+          style={[
+            styles.navStatusDot,
+            walletReady && styles.navStatusDotReady,
+          ]}
+        />
       </Pressable>
 
       <View style={styles.segment}>
@@ -305,6 +322,30 @@ function TopNavigation({
         <UserRound color={appTheme.colors.goldBright} size={20} />
       </Pressable>
     </View>
+  )
+}
+
+function WalletOnboardingNudge() {
+  const appTheme = useAppTheme()
+  const styles = useMemo(() => createStyles(appTheme), [appTheme])
+
+  return (
+    <TerminalCard style={styles.walletNudge}>
+      <View style={styles.walletNudgeIcon}>
+        <WalletCards color={appTheme.colors.goldBright} size={22} />
+      </View>
+      <View style={styles.walletNudgeCopy}>
+        <AppText variant="caption" color="goldBright">
+          先创建 Agent 钱包
+        </AppText>
+        <AppText color="textSecondary">
+          用邮箱验证码登录后，就可以在对话里启动赚币 Agent、充值、提现和生成交易卡。
+        </AppText>
+      </View>
+      <Button variant="secondary" onPress={() => router.push('/wallet/connect')}>
+        去创建
+      </Button>
+    </TerminalCard>
   )
 }
 
@@ -720,6 +761,18 @@ function createStyles(appTheme: AppTheme) {
     borderRadius: theme.radius.pill,
     backgroundColor: appTheme.colors.surfaceElevated,
   },
+  navStatusDot: {
+    position: 'absolute',
+    right: 5,
+    top: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: appTheme.colors.textMuted,
+  },
+  navStatusDotReady: {
+    backgroundColor: appTheme.colors.success,
+  },
   segment: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -786,6 +839,29 @@ function createStyles(appTheme: AppTheme) {
         ? 'rgba(247, 242, 232, 0.03)'
         : 'rgba(124, 58, 237, 0.05)',
     paddingHorizontal: theme.spacing.sm,
+  },
+  walletNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  walletNudgeIcon: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: appTheme.colors.gold,
+    borderRadius: theme.radius.lg,
+    backgroundColor:
+      appTheme.mode === 'dark'
+        ? 'rgba(216, 180, 95, 0.1)'
+        : 'rgba(124, 58, 237, 0.08)',
+  },
+  walletNudgeCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: theme.spacing.xs,
   },
   guideGrid: {
     flexDirection: 'row',

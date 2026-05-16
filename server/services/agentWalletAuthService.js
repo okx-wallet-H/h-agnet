@@ -1,4 +1,5 @@
 const onchainosWalletAdapter = require('../adapters/onchainosWalletAdapter')
+const { createAgentWalletCreatedCard } = require('./cardsService')
 const {
   bindAgentWalletSession,
   getCurrentUserIdentity,
@@ -41,8 +42,12 @@ async function verifyAgentWalletOtp(input) {
     email,
   })
   const identity = bindAgentWalletSession(session)
+  const enrichedSession = enrichAgentWalletSession(session, identity)
 
-  return enrichAgentWalletSession(session, identity)
+  return {
+    ...enrichedSession,
+    walletCreatedCard: createAgentWalletCreatedCard(enrichedSession),
+  }
 }
 
 async function getAgentWalletSession() {

@@ -23,6 +23,11 @@ Rules:
 
 ```txt
 H.skill.wallet.balance → GET /api/h/v1/wallet/account
+H.wallet.auth.status   → GET /api/h/v1/auth/agent-wallet/status
+H.wallet.auth.requestCode → POST /api/h/v1/auth/agent-wallet/request-otp
+H.wallet.auth.verifyCode  → POST /api/h/v1/auth/agent-wallet/verify
+H.wallet.session.status   → GET /api/h/v1/auth/agent-wallet/session
+H.card.wallet.created     → wallet-created card in Card Library
 H.agent.strategies     → GET /api/h/v1/agent/strategies
 H.agent.strategyPlan   → GET /api/h/v1/agent/strategies/:id/plan
 H.agent.skills         → GET /api/h/v1/agent/skill-wrappers

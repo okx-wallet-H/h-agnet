@@ -1,3 +1,5 @@
+import type { ConversationCard } from '../cards/types'
+
 export type AgentWalletAuthStep =
   | 'email-entry'
   | 'okx-otp-requested'
@@ -18,6 +20,7 @@ export type AgentWalletAuthSession = {
   evmAddress?: string
   solAddress?: string
   loginType?: 'email' | 'api-key'
+  walletCreatedCard?: ConversationCard
 }
 
 export type AgentWalletAuthRemoteStatus = {

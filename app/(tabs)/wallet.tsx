@@ -17,6 +17,7 @@ import { StatusPill } from '../../src/components/primitives/StatusPill'
 import { MetricRow } from '../../src/components/terminal/MetricRow'
 import { TerminalCard } from '../../src/components/terminal/TerminalCard'
 import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme'
+import { useAgentWalletSession } from '../../src/features/auth/hooks/useAgentWalletAuth'
 import {
   useWalletAccount,
   useWalletAssets,
@@ -58,10 +59,12 @@ export default function WalletScreen() {
     status,
   } = useWalletStore()
   const remoteAccount = useWalletAccount()
+  const walletSession = useAgentWalletSession()
   const walletAssets = useWalletAssets()
   const walletChains = useWalletChains()
   const currentAccount = account ?? remoteAccount.data ?? null
-  const isConnected = Boolean(currentAccount) && status !== 'error'
+  const sessionReady = Boolean(walletSession.data)
+  const isConnected = (Boolean(currentAccount) || sessionReady) && status !== 'error'
   const networkSlots =
     walletChains.data && walletChains.data.length > 0
       ? walletChains.data.map((chain) => chain.name)
@@ -119,7 +122,9 @@ export default function WalletScreen() {
             <AppText variant="section">
               {currentAccount?.address
                 ? shortenAddress(currentAccount.address)
-                : '还没有 Agent 钱包'}
+                : sessionReady
+                  ? 'Agent 钱包会话已建立'
+                  : '还没有 Agent 钱包'}
             </AppText>
             <AppText color="textMuted">
               {isConnected
@@ -129,13 +134,27 @@ export default function WalletScreen() {
           </View>
           <MetricRow
             label="钱包来源"
-            value={currentAccount ? formatProvider(currentAccount.provider) : '未连接'}
+            value={
+              currentAccount || sessionReady
+                ? 'OKX Agent Wallet'
+                : '未连接'
+            }
             valueColor={isConnected ? 'goldBright' : 'textMuted'}
           />
           <MetricRow
             label="当前网络"
             value={currentAccount?.chainId ?? '未选择'}
             valueColor={isConnected ? 'violet' : 'textMuted'}
+          />
+          <MetricRow
+            label="登录邮箱"
+            value={walletSession.data?.email ?? '未登录'}
+            valueColor={sessionReady ? 'goldBright' : 'textMuted'}
+          />
+          <MetricRow
+            label="会话状态"
+            value={sessionReady ? '已建立' : '等待创建'}
+            valueColor={sessionReady ? 'success' : 'textMuted'}
           />
         </View>
       </LinearGradient>
@@ -255,26 +274,6 @@ function shortenAddress(address: string) {
   }
 
   return `${address.slice(0, 8)}...${address.slice(-8)}`
-}
-
-function formatProvider(provider: string) {
-  if (provider === 'okx-agent-wallet') {
-    return 'OKX Agent Wallet'
-  }
-
-  if (provider === 'okx-wallet') {
-    return 'OKX 钱包'
-  }
-
-  if (provider === 'walletconnect') {
-    return 'WalletConnect'
-  }
-
-  if (provider === 'embedded') {
-    return '嵌入式钱包'
-  }
-
-  return provider
 }
 
 function createStyles(appTheme: AppTheme) {
