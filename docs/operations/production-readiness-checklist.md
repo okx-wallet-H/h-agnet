@@ -71,8 +71,10 @@ H_AGENT_AI_API_KEY
 
 * Choose the production AI provider and model.
 * Provide server-side AI API key.
-* Decide whether the first knowledge store is PostgreSQL full-text, a vector
-  database, or a managed retrieval system.
+* Choose the vector index store for AI knowledge retrieval.
+* Define the embedding model, chunking rules, metadata schema, and reindex job.
+* Confirm PostgreSQL remains the source of truth for cards, grants, Runner
+  state, balances, rewards, and execution status.
 
 ### OKX / OnchainOS
 

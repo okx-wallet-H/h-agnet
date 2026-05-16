@@ -142,6 +142,17 @@ latency.
 
 AI must use H Wallet knowledge and H APIs, not raw provider access.
 
+The production knowledge layer should be hybrid:
+
+* PostgreSQL stores authoritative business state: users, Agent Wallet bindings,
+  cards, grants, strategy runs, scoring, side quests, and audit records.
+* A vector index stores semantic retrieval material: approved docs, strategy
+  explanations, H Skill descriptions, safe card summaries, and support
+  knowledge.
+* The AI context builder combines scoped vector retrieval with server-side
+  summaries from PostgreSQL. It must not treat vector search as the source of
+  truth for balances, authorization, rewards, or execution status.
+
 Knowledge sources:
 
 * product rules from AGENTS.md and architecture docs.

@@ -42,6 +42,24 @@ process summary or backend audit record.
 
 ## Knowledge Sources
 
+H Wallet will use a hybrid knowledge architecture:
+
+```txt
+PostgreSQL
+-> product facts, users, cards, strategy runs, grants, scores
+
+Vector index store
+-> semantic retrieval for docs, strategy descriptions, card summaries,
+   support knowledge, community guidance, and AI memory
+
+AI context builder
+-> retrieves scoped snippets, summarizes user state, and passes only the
+   minimum context needed for the current command
+```
+
+PostgreSQL remains the source of truth for business state. The vector index is
+for retrieval, not authorization, balances, execution status, or reward truth.
+
 ### Static Product Knowledge
 
 Stored in repo docs and later indexed:
@@ -65,7 +83,9 @@ Stored in the database:
 
 ### User Context
 
-Derived from Card Library and user state:
+Derived from Card Library and user state. Raw user records stay in PostgreSQL;
+the vector index may store approved summaries or embeddings, not secrets or raw
+provider credentials:
 
 * Agent Wallet binding state.
 * verified cards.
@@ -83,6 +103,34 @@ Only fetched by backend adapters:
 * OKX transaction status.
 * OKX security and simulation responses.
 * OnchainOS skill outputs.
+
+### Vector Index Scope
+
+The vector index may contain:
+
+* product docs and policy snippets.
+* strategy descriptions and versioned strategy explanations.
+* H Skill wrapper descriptions.
+* support knowledge for Chinese user education.
+* card summaries approved for AI recall.
+* anonymized or user-scoped memory summaries.
+
+The vector index must not contain:
+
+* OKX API keys, passphrases, private keys, or raw secrets.
+* unverified balance, yield, reward, or transaction claims.
+* raw OTP codes or password-like credentials.
+* CEX data mixed into Onchain Agent Wallet context.
+* authorization grants as the source of truth.
+
+Every retrieved item should carry source metadata:
+
+* `sourceType`
+* `sourceId`
+* `version`
+* `userScope`
+* `updatedAt`
+* `trustLevel`
 
 ## Prompt Layers
 
@@ -139,14 +187,18 @@ Phase 1:
 Phase 2:
 
 * add a knowledge ingestion job.
-* index approved docs and strategy records.
+* index approved docs, strategy records, H Skill descriptions, and safe card
+  summaries into a vector index.
 * add retrieval metadata for source, version, and update time.
+* keep PostgreSQL IDs as back-references so retrieval can be traced back to
+  authoritative product records.
 
 Phase 3:
 
 * connect management backend for strategy and prompt version changes.
 * add evaluation sets for common Chinese commands.
 * add regression tests for blocked execution and hallucination cases.
+* add vector recall evaluations for Chinese low-cognition user phrasing.
 
 ## Minimum AI Evaluation Set
 
