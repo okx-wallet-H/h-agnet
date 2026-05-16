@@ -39,7 +39,7 @@ const adapterDefinitions = [
     wrapperId: 'H.skill.signal.readOnchainSignals',
     providerSkill: 'okx-dex-signal',
     providerMethod: 'signalList',
-    adapterStatus: 'adapter-shell',
+    adapterStatus: 'ready',
     executionMode: 'read-only-adapter',
     assetImpact: 'none',
     failStrategy: 'block-on-error',

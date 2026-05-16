@@ -66,6 +66,12 @@ const providerDefinitions = [
     transport: 'okx-onchainos-skill',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: '聪明钱、鲸鱼、KOL 和链上买入信号读取',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation:
+          '当前开放 signal/list 最新买入方向信号读取；信号只作为策略观察输入，不直接触发交易。',
+        supportedMethods: getReadyProviderMethods('okx-dex-signal'),
+      }),
   },
   {
     id: 'okx-dex-token',

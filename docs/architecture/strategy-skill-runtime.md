@@ -145,6 +145,13 @@ into H Wallet market trend rows, and records the invocation. If OKX returns a
 non-success code, an empty response, or a provider error, H Wallet must not
 invent market data.
 
+`H.skill.signal.readOnchainSignals` maps to `okx-dex-signal` / OKX Signal List
+API. It is a read-only strategy input for aggregated buy signals from smart
+money, KOL / influencer, and whale wallets. Signal rows are normalized into H
+Wallet fields such as token, wallet type, trigger wallet count, amount USD,
+sold ratio, and holding bias. These signals must never trigger asset actions by
+themselves; they only inform strategy planning, risk review, and card output.
+
 The first risk-gate invoke target is `H.skill.risk.scanTransaction`. Its first
 connected provider method is `okx-security` / token-scan through
 `/api/v6/security/token-scan`. This scans contract tokens and normalizes OKX's

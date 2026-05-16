@@ -376,20 +376,66 @@ async function invokeSignalReadOnchainSignals(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'dex-signal-adapter-not-connected',
-    message:
-      '链上信号读取协议已识别；真实 okx-dex-signal adapter 尚未接入。H Wallet 不伪造信号。',
-    resultData: {
-      signalGate: 'blocked',
-      signalProvider: 'okx-dex-signal',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-dex-signal',
-    },
-  })
+  try {
+    const requestInput = mapSignalListInput(input)
+    const output = await okxOnchainHttpClient.getSignalList(requestInput)
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-dex-signal-list-rejected',
+        message:
+          'OKX Signal List API 未返回成功结果，H Wallet 不生成自有链上信号。',
+        resultData: {
+          signalGate: 'blocked',
+          signalProvider: 'okx-dex-signal',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    const signals = normalizeOkxSignalList(output.response)
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-signal-list-completed',
+      message: signals.length
+        ? '已通过 OKX Signal List API 读取真实链上买入信号。'
+        : 'OKX Signal List API 已返回成功结果；当前筛选条件下暂无信号。',
+      resultData: {
+        signalGate: 'completed',
+        signalProvider: 'okx-dex-signal',
+        action: 'observe',
+        provider: 'okx-dex-signal',
+        source: 'okx-onchainos-api',
+        request: output.request,
+        requestContext: requestInput.context,
+        signalCount: signals.length,
+        signals,
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-signal-list-error',
+      fallbackMessage:
+        'OKX Signal List API 请求失败。H Wallet 不生成自有链上信号。',
+      error,
+      resultData: {
+        signalGate: 'blocked',
+        signalProvider: 'okx-dex-signal',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-dex-signal',
+      },
+    })
+  }
 }
 
 async function invokeTokenAnalyzeRisk(wrapper, input) {
@@ -1217,14 +1263,30 @@ function validateSignalInput(input) {
   const token = normalizeString(input.token)
   const tokenAddress = normalizeString(input.tokenAddress)
   const chain = normalizeString(input.chain)
+  const chainIndex = normalizeString(input.chainIndex)
   const watchlistId = normalizeString(input.watchlistId)
 
-  if (!strategyId && !token && !tokenAddress && !chain && !watchlistId) {
+  if (
+    !strategyId &&
+    !token &&
+    !tokenAddress &&
+    !chain &&
+    !chainIndex &&
+    !watchlistId
+  ) {
     return {
       ok: false,
       code: 'signal-context-required',
       message:
-        '链上信号读取需要 strategyId、token、tokenAddress、chain 或 watchlistId。',
+        '链上信号读取需要 strategyId、token、tokenAddress、chain、chainIndex 或 watchlistId。',
+    }
+  }
+
+  if ((token || tokenAddress || watchlistId) && !strategyId && !chain && !chainIndex) {
+    return {
+      ok: false,
+      code: 'signal-chain-required',
+      message: '指定 token 或 watchlist 读取信号时需要 chain 或 chainIndex。',
     }
   }
 
@@ -1950,6 +2012,198 @@ function getRiskScanMessage(aggregate) {
   }
 
   return 'OKX Security 已完成 Token Scan，未发现阻断级 token 风险。'
+}
+
+function mapSignalListInput(input) {
+  const strategyId = normalizeString(input.strategyId)
+  const strategy = strategyId
+    ? strategySkillRepository.findStrategyById(strategyId)
+    : null
+  const requestedChain = normalizeString(input.chain)
+  const requestedChainIndex = normalizeString(input.chainIndex)
+  const strategyDefaultChain =
+    !requestedChain && !requestedChainIndex
+      ? getStrategyDefaultSignalChain(strategy)
+      : ''
+  const chain = requestedChain || strategyDefaultChain
+
+  return {
+    chain,
+    chainIndex: requestedChainIndex,
+    cursor: normalizeString(input.cursor),
+    limit: normalizeString(input.limit) || '20',
+    maxAddressCount: input.maxAddressCount,
+    maxAmountUsd: input.maxAmountUsd,
+    maxLiquidityUsd: input.maxLiquidityUsd,
+    maxMarketCapUsd: input.maxMarketCapUsd,
+    minAddressCount: input.minAddressCount,
+    minAmountUsd: input.minAmountUsd,
+    minLiquidityUsd: input.minLiquidityUsd,
+    minMarketCapUsd: input.minMarketCapUsd,
+    tokenAddress: normalizeString(input.tokenAddress),
+    walletType: normalizeSignalWalletType(input.walletType),
+    context: {
+      defaultChainApplied: Boolean(strategyDefaultChain),
+      signalInputType: getSignalInputType(input),
+      strategyId: strategy?.id ?? (strategyId || null),
+      strategyVersion: strategy?.version ?? null,
+      token: normalizeString(input.token) || null,
+      tokenAddress: normalizeString(input.tokenAddress) || null,
+      walletType: normalizeSignalWalletType(input.walletType),
+      chain: chain || null,
+      chainIndex: requestedChainIndex || null,
+    },
+  }
+}
+
+function getStrategyDefaultSignalChain(strategy) {
+  if (!strategy || !Array.isArray(strategy.supportedChains)) {
+    return ''
+  }
+
+  const preferredChains = ['solana', 'x layer', 'base', 'ethereum']
+
+  for (const preferred of preferredChains) {
+    const match = strategy.supportedChains.find(
+      (chain) => normalizeString(chain).toLowerCase() === preferred,
+    )
+
+    if (match) {
+      return match
+    }
+  }
+
+  return strategy.supportedChains[0] || ''
+}
+
+function getSignalInputType(input) {
+  if (normalizeString(input.strategyId)) {
+    return 'strategy'
+  }
+
+  if (normalizeString(input.tokenAddress)) {
+    return 'token-address'
+  }
+
+  if (normalizeString(input.token)) {
+    return 'token'
+  }
+
+  if (normalizeString(input.watchlistId)) {
+    return 'watchlist'
+  }
+
+  if (normalizeString(input.chain) || normalizeString(input.chainIndex)) {
+    return 'chain'
+  }
+
+  return 'unknown'
+}
+
+function normalizeSignalWalletType(input) {
+  if (Array.isArray(input)) {
+    return input.map(String).map((item) => item.trim()).filter(Boolean).join(',')
+  }
+
+  return normalizeString(input) || '1,2,3'
+}
+
+function normalizeOkxSignalList(response) {
+  return getOkxResponseRows(response)
+    .map((row, index) => normalizeOkxSignal(row, index))
+    .filter(Boolean)
+}
+
+function normalizeOkxSignal(row, index) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return null
+  }
+
+  const token = row.token && typeof row.token === 'object' ? row.token : {}
+  const soldRatioPercent = pickFirst(row, ['soldRatioPercent'])
+
+  return removeEmptyFields({
+    listPosition: index + 1,
+    timestamp: pickFirst(row, ['timestamp', 'requestTime']),
+    chainIndex: pickFirst(row, ['chainIndex', 'chainId']),
+    walletType: normalizeOkxSignalWalletType(row.walletType),
+    walletTypeRaw: pickFirst(row, ['walletType']),
+    triggerWalletCount: pickFirst(row, ['triggerWalletCount']),
+    triggerWalletSample: getWalletAddressSample(row.triggerWalletAddress),
+    amountUsd: pickFirst(row, ['amountUsd']),
+    priceUsd: pickFirst(row, ['price', 'priceUsd']),
+    soldRatioPercent,
+    holdingBias: getSignalHoldingBias(soldRatioPercent),
+    cursor: pickFirst(row, ['cursor']),
+    token: removeEmptyFields({
+      tokenAddress: pickFirst(token, ['tokenAddress', 'tokenContractAddress']),
+      symbol: pickFirst(token, ['symbol', 'tokenSymbol']),
+      name: pickFirst(token, ['name', 'tokenName']),
+      logo: pickFirst(token, ['logo', 'tokenLogoUrl']),
+      marketCapUsd: pickFirst(token, ['marketCapUsd', 'marketCap']),
+      holders: pickFirst(token, ['holders', 'holderCount']),
+      top10HolderPercent: pickFirst(token, [
+        'top10HolderPercent',
+        'top10HoldPercent',
+      ]),
+    }),
+  })
+}
+
+function normalizeOkxSignalWalletType(input) {
+  const value = normalizeString(input)
+  const map = {
+    '1': 'Smart Money',
+    '2': 'KOL / Influencer',
+    '3': 'Whale',
+    SMART_MONEY: 'Smart Money',
+    INFLUENCER: 'KOL / Influencer',
+    KOL: 'KOL / Influencer',
+    WHALE: 'Whale',
+  }
+
+  return map[value] ?? value
+}
+
+function getWalletAddressSample(input) {
+  const value = normalizeString(input)
+
+  if (!value) {
+    return []
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+    .map(truncateAddress)
+}
+
+function truncateAddress(input) {
+  if (input.length <= 12) {
+    return input
+  }
+
+  return `${input.slice(0, 6)}...${input.slice(-4)}`
+}
+
+function getSignalHoldingBias(input) {
+  const value = Number(input)
+
+  if (!Number.isFinite(value)) {
+    return null
+  }
+
+  if (value < 35) {
+    return 'still-holding'
+  }
+
+  if (value < 70) {
+    return 'partially-sold'
+  }
+
+  return 'mostly-sold'
 }
 
 function mapMarketTrendInput(input) {
