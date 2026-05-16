@@ -288,7 +288,7 @@ async function request(method, path, payload) {
   }
 
   return {
-    ok: data?.code === '0',
+    ok: String(data?.code) === '0',
     request: {
       method,
       path,
