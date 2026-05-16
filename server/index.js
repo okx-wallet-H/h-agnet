@@ -17,7 +17,7 @@ const {
 const {
   archiveCard,
   confirmCardReview,
-  createCard,
+  createClientConversationCard,
   getCardLibraryStats,
   listConversationCards,
   listCards,
@@ -335,7 +335,10 @@ async function handleRequest(request, response) {
 
     if (request.method === 'POST' && routePath === '/cards') {
       const body = await readJsonBody(request)
-      sendJson(response, 200, { ok: true, data: createCard(body) })
+      sendJson(response, 200, {
+        ok: true,
+        data: createClientConversationCard(body),
+      })
       return
     }
 

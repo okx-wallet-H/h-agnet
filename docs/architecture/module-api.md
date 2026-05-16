@@ -290,6 +290,13 @@ Cards may include `userId` when a H Wallet identity is active. The Card Library
 service should read the current identity from the auth boundary and attach it
 server-side. Screens must not decide card ownership.
 
+`POST /cards` is a client-safe draft note endpoint only. Ordinary clients may
+create non-proof conversation drafts such as `system-status`,
+`portfolio-insight`, or `side-quest` with `source: user-action`; they cannot
+create trade-success, wallet-created, execution-receipt, pending-execution, or
+service/OKX-sourced cards. Proof-like cards must come from backend modules,
+H Skill wrappers, execution handoff, or OKX verification.
+
 Card Library stats keep the legacy response shape for app compatibility, but
 the counters are derived only from the eligible trading subset:
 

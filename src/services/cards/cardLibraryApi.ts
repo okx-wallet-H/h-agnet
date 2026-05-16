@@ -2,15 +2,27 @@ import { apiRequest } from '../api/httpClient'
 import type {
   CardConfirmationResult,
   CardLibraryStats,
+  CardMetric,
   ConversationCard,
   TradeResultVerificationInput,
   TradeResultVerificationResult,
 } from './types'
 
-export type CreateConversationCardInput = Omit<
-  ConversationCard,
-  'id' | 'createdAt'
+type ClientConversationCardType = Extract<
+  ConversationCard['type'],
+  'portfolio-insight' | 'side-quest' | 'system-status'
 >
+
+export type CreateConversationCardInput = {
+  type: ClientConversationCardType
+  status: 'draft'
+  source: 'user-action'
+  title: string
+  summary: string
+  metrics: CardMetric[]
+  metadata?: Record<string, unknown>
+  tags: string[]
+}
 
 export type CardLibraryApi = {
   listCards: () => Promise<ConversationCard[]>

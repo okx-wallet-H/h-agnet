@@ -55,6 +55,12 @@ const confirmationCardTypes = new Set([
   'trade-confirmation',
 ])
 
+const clientCreatableCardTypes = new Set([
+  'portfolio-insight',
+  'side-quest',
+  'system-status',
+])
+
 const cardLibraryTradeInProgressStatuses = new Set([
   'pending-execution',
 ])
@@ -541,6 +547,38 @@ function createCard(input) {
   return cardRepository.insert(card)
 }
 
+function createClientConversationCard(input) {
+  if (!input || typeof input !== 'object') {
+    throw createHttpError(400, 'bad-request', '卡片输入必须是对象。')
+  }
+
+  if (!clientCreatableCardTypes.has(input.type)) {
+    throw createHttpError(
+      403,
+      'client-card-type-forbidden',
+      '普通客户端只能创建非证明类草稿记录卡。',
+    )
+  }
+
+  if (input.status !== 'draft') {
+    throw createHttpError(
+      403,
+      'client-card-status-forbidden',
+      '普通客户端只能创建草稿状态的记录卡。',
+    )
+  }
+
+  if (input.source !== 'user-action') {
+    throw createHttpError(
+      403,
+      'client-card-source-forbidden',
+      '普通客户端不能声明后端服务或 OKX 来源。',
+    )
+  }
+
+  return createCard(input)
+}
+
 function listCards() {
   return cardRepository
     .list({ userId: getCurrentUserId() })
@@ -854,6 +892,7 @@ module.exports = {
   confirmCardReview,
   createAgentWalletCreatedCard,
   createCard,
+  createClientConversationCard,
   getCardLibraryStats,
   listConversationCards,
   listCards,

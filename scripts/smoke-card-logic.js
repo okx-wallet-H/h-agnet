@@ -14,6 +14,7 @@ const { userRepository } = require('../server/repositories/userRepository')
 const {
   archiveCard,
   createCard,
+  createClientConversationCard,
   getCardLibraryStats,
   listCards,
   listConversationCards,
@@ -38,6 +39,7 @@ const {
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
+  const clientCardBoundary = smokeClientCardBoundary()
   const conversationTurnLinking = await smokeConversationTurnLinking()
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
@@ -48,6 +50,7 @@ async function main() {
       {
         ok: true,
         authorizedBlockedPipeline,
+        clientCardBoundary,
         conversationBoundary,
         conversationTurnLinking,
         executionHandoff,
@@ -57,6 +60,45 @@ async function main() {
       2,
     ),
   )
+}
+
+function smokeClientCardBoundary() {
+  resetMemoryState()
+
+  const noteCard = createClientConversationCard({
+    type: 'system-status',
+    status: 'draft',
+    source: 'user-action',
+    title: '客户端草稿记录',
+    summary: '普通客户端只能创建非证明类草稿记录。',
+    metrics: [{ label: '资产影响', value: '无', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'system', 'client-note'],
+  })
+
+  assert.equal(noteCard.status, 'draft')
+  assert.equal(listCards().length, 0)
+
+  assert.throws(
+    () =>
+      createClientConversationCard({
+        type: 'trade-success',
+        status: 'completed',
+        source: 'okx-onchainos',
+        title: '伪造交易成功',
+        summary: '普通客户端不能创建这类证明卡。',
+        metrics: [],
+        metadata: {},
+        tags: ['conversation', 'trading'],
+      }),
+    (error) => error.code === 'client-card-type-forbidden',
+  )
+
+  return {
+    clientDraftCreated: true,
+    forgedTradeSuccessRejected: true,
+    cardLibraryCards: listCards().length,
+  }
 }
 
 async function smokeConversationTurnLinking() {
