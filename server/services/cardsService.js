@@ -567,14 +567,16 @@ function getCardLibraryStats() {
   const latestCard = cards[0]
   const confirmationCards = activeCards.filter(isConfirmationCard)
   const draftCards = activeCards.filter((card) => card.status === 'draft')
-  const pendingCards = activeCards.filter(
+  const pendingCards = confirmationCards.filter(
     (card) => card.status === 'requires-confirmation',
   )
-  const confirmedCards = activeCards.filter((card) => card.status === 'confirmed')
-  const pendingExecutionCards = activeCards.filter(
+  const confirmedCards = confirmationCards.filter(
+    (card) => card.status === 'confirmed',
+  )
+  const pendingExecutionCards = confirmationCards.filter(
     (card) => card.status === 'pending-execution',
   )
-  const blockedCards = activeCards.filter((card) => card.status === 'blocked')
+  const blockedCards = confirmationCards.filter((card) => card.status === 'blocked')
   const completedCards = activeCards.filter((card) => card.status === 'completed')
   const walletActionCards = activeCards.filter((card) =>
     walletActionCardTypes.has(card.type),
@@ -663,8 +665,39 @@ function getCardLibraryStats() {
 function isConfirmationCard(card) {
   return (
     confirmationCardTypes.has(card.type) ||
-    card.tags.includes('official-strategy')
+    card.tags.includes('official-strategy') ||
+    isAuthorizationRequired(card)
   )
+}
+
+function isAuthorizationFlowCard(card) {
+  if (getAuthorizationStatus(card) === 'not-required') {
+    return false
+  }
+
+  return (
+    confirmationCardTypes.has(card.type) ||
+    card.tags.includes('official-strategy') ||
+    isAuthorizationRequired(card)
+  )
+}
+
+function isAuthorizationRequired(card) {
+  return ['authorization-required', 'identity-required'].includes(
+    getAuthorizationStatus(card),
+  )
+}
+
+function getAuthorizationStatus(card) {
+  return (
+    readString(card.metadata?.authorizationStatus) ??
+    readString(card.metadata?.agentAuthorization?.authorizationStatus) ??
+    null
+  )
+}
+
+function readString(value) {
+  return typeof value === 'string' ? value : null
 }
 
 function archiveCard(cardId) {
@@ -703,6 +736,14 @@ function prepareCardForConfirmation(cardId) {
       409,
       'invalid-card-state',
       '已授权卡片不需要进入授权队列。',
+    )
+  }
+
+  if (!isAuthorizationFlowCard(card)) {
+    throw createHttpError(
+      409,
+      'authorization-not-required',
+      '这张卡只是记录信息，不需要授权。',
     )
   }
 
@@ -745,6 +786,14 @@ function confirmCardReview(cardId) {
       409,
       'identity-required',
       '请先完成 H Wallet 登录与 Agent Wallet 绑定，再进行授权。',
+    )
+  }
+
+  if (!isAuthorizationFlowCard(card)) {
+    throw createHttpError(
+      409,
+      'authorization-not-required',
+      '这张卡只是记录信息，不需要授权。',
     )
   }
 

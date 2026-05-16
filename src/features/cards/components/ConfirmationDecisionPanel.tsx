@@ -18,7 +18,10 @@ import {
   useConfirmConversationCard,
   usePrepareConversationCardForConfirmation,
 } from '../hooks/useCardLibrary'
-import { getDisplayCardSnapshot } from '../model/confirmationQueue'
+import {
+  getDisplayCardSnapshot,
+  isAuthorizationFlowCard,
+} from '../model/confirmationQueue'
 
 type ConfirmationDecisionPanelProps = {
   card: ConversationCard
@@ -38,9 +41,15 @@ export function ConfirmationDecisionPanel({
   const confirmCard = useConfirmConversationCard()
   const archiveCard = useArchiveConversationCard()
   const copy = getDecisionCopy(currentCard)
+  const canEnterAuthorization = isAuthorizationFlowCard(currentCard)
 
   function handlePrimary() {
     setErrorMessage(null)
+
+    if (!canEnterAuthorization) {
+      router.push('/cards')
+      return
+    }
 
     if (currentCard.status === 'draft') {
       prepareCard.mutate(currentCard.id, {
@@ -163,6 +172,15 @@ export function ConfirmationDecisionPanel({
 }
 
 function getDecisionCopy(card: ConversationCard) {
+  if (!isAuthorizationFlowCard(card)) {
+    return {
+      title: '这张卡无需授权',
+      body: '它只是一次对话记录，不会触发钱包、交易或转账动作。后续可以在卡库里查看。',
+      statusLabel: '无需授权',
+      tone: 'muted' as const,
+    }
+  }
+
   if (card.tags.includes('official-strategy')) {
     if (card.status === 'draft') {
       return {
@@ -255,7 +273,15 @@ function getDecisionCopy(card: ConversationCard) {
 }
 
 function getPrimaryLabel(card: ConversationCard, isPending: boolean) {
+  if (!isAuthorizationFlowCard(card)) {
+    return '查看卡库'
+  }
+
   if (card.status === 'draft') {
+    if (card.tags.includes('official-strategy')) {
+      return isPending ? '正在生成启动授权卡' : '生成启动授权卡'
+    }
+
     return isPending ? '正在生成授权卡' : '生成授权卡'
   }
 

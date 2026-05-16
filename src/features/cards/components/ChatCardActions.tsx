@@ -13,7 +13,10 @@ import {
   useArchiveConversationCard,
   usePrepareConversationCardForConfirmation,
 } from '../hooks/useCardLibrary'
-import { getDisplayCardSnapshot } from '../model/confirmationQueue'
+import {
+  getDisplayCardSnapshot,
+  isAuthorizationFlowCard,
+} from '../model/confirmationQueue'
 
 type ChatCardActionsProps = {
   card: ConversationCard
@@ -88,12 +91,13 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
   const copy = getStatusCopy(currentCard)
   const isDraft = currentCard.status === 'draft'
   const isAgentAuthorized = currentCard.status === 'agent-authorized'
+  const canEnterAuthorization = isAuthorizationFlowCard(currentCard)
   const isPreparing = prepareCard.isPending
   const canArchive =
     currentCard.status !== 'archived' && currentCard.status !== 'completed'
 
   function handlePrimaryAction() {
-    if (isDraft) {
+    if (isDraft && canEnterAuthorization) {
       prepareCard.mutate(currentCard.id, {
         onSuccess(nextCard) {
           setUpdatedCard(nextCard)
@@ -104,6 +108,7 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
     }
 
     if (
+      !canEnterAuthorization ||
       isAgentAuthorized ||
       currentCard.status === 'pending-execution' ||
       currentCard.status === 'completed' ||
@@ -150,8 +155,15 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
       </View>
 
       <View style={styles.actions}>
-        <Button fullWidth disabled={isDraft && isPreparing} onPress={handlePrimaryAction}>
-          {getPrimaryLabel(currentCard.status, isPreparing)}
+        <Button
+          fullWidth
+          disabled={isDraft && canEnterAuthorization && isPreparing}
+          onPress={handlePrimaryAction}
+        >
+          {getPrimaryLabel(currentCard, {
+            canEnterAuthorization,
+            isPreparing,
+          })}
         </Button>
         {canArchive ? (
           <Button
@@ -178,6 +190,15 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
 }
 
 function getStatusCopy(card: ConversationCard) {
+  if (!isAuthorizationFlowCard(card)) {
+    return {
+      title: '已记录到卡库',
+      body: '这张卡只是记录对话和上下文，不需要授权，也不会触发钱包、交易或转账动作。',
+      status: '无需授权',
+      tone: 'muted' as const,
+    }
+  }
+
   if (card.tags.includes('official-strategy')) {
     if (card.status === 'draft') {
       return {
@@ -202,26 +223,40 @@ function getStatusCopy(card: ConversationCard) {
 }
 
 function getPrimaryLabel(
-  status: ConversationCard['status'],
-  isPreparing: boolean,
+  card: ConversationCard,
+  {
+    canEnterAuthorization,
+    isPreparing,
+  }: {
+    canEnterAuthorization: boolean
+    isPreparing: boolean
+  },
 ) {
-  if (status === 'draft') {
-    return isPreparing ? '正在生成授权卡' : '生成授权卡'
-  }
-
-  if (status === 'completed' || status === 'archived') {
+  if (!canEnterAuthorization) {
     return '查看卡库'
   }
 
-  if (status === 'agent-authorized') {
+  if (card.status === 'draft') {
+    if (card.tags.includes('official-strategy')) {
+      return isPreparing ? '正在生成启动授权卡' : '授权启动 Agent'
+    }
+
+    return isPreparing ? '正在生成授权卡' : '生成授权卡'
+  }
+
+  if (card.status === 'completed' || card.status === 'archived') {
+    return '查看卡库'
+  }
+
+  if (card.status === 'agent-authorized') {
     return '查看执行状态'
   }
 
-  if (status === 'pending-execution') {
+  if (card.status === 'pending-execution') {
     return '查看执行状态'
   }
 
-  if (status === 'blocked') {
+  if (card.status === 'blocked') {
     return '查看原因'
   }
 

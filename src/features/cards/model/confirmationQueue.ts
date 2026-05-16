@@ -8,9 +8,32 @@ export const confirmationQueueStatuses = [
   'blocked',
 ] as const
 
+const authorizationCardTypes = new Set<ConversationCard['type']>([
+  'wallet-confirmation',
+  'trade-confirmation',
+])
+
 export function isConfirmationQueueCard(card: ConversationCard) {
-  return confirmationQueueStatuses.includes(
-    card.status as (typeof confirmationQueueStatuses)[number],
+  return (
+    isAuthorizationFlowCard(card) &&
+    confirmationQueueStatuses.includes(
+      card.status as (typeof confirmationQueueStatuses)[number],
+    )
+  )
+}
+
+export function isAuthorizationFlowCard(card: ConversationCard) {
+  const authorizationStatus = getAuthorizationStatus(card)
+
+  if (authorizationStatus === 'not-required') {
+    return false
+  }
+
+  return (
+    authorizationCardTypes.has(card.type) ||
+    card.tags.includes('official-strategy') ||
+    authorizationStatus === 'authorization-required' ||
+    authorizationStatus === 'identity-required'
   )
 }
 
@@ -62,6 +85,30 @@ export function getDisplayCardSnapshot(
   }
 
   return serverCard
+}
+
+function getAuthorizationStatus(card: ConversationCard) {
+  const directStatus = readString(card.metadata?.authorizationStatus)
+
+  if (directStatus) {
+    return directStatus
+  }
+
+  const agentAuthorization = card.metadata?.agentAuthorization
+
+  if (!isRecord(agentAuthorization)) {
+    return null
+  }
+
+  return readString(agentAuthorization.authorizationStatus)
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' ? value : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 export function getCardActionTitle(status: ConversationCard['status']) {
