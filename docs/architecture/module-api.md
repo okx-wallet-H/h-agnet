@@ -310,8 +310,10 @@ Library card.
 
 When a pending trade receives a real execution callback from the Agent Wallet
 runner, `POST /cards/:id/execution-handoff` records the returned `txHash` on the
-pending card. This is a handoff receipt only; it does not create a success card
-and it cannot overwrite a different existing transaction hash.
+pending card. This is an internal runner endpoint protected by
+`H_WALLET_EXECUTION_TOKEN`; the mobile app must not store this token or call the
+handoff endpoint directly. The handoff is a receipt only; it does not create a
+success card and it cannot overwrite a different existing transaction hash.
 
 After the handoff, `POST /cards/:id/verify-trade` checks OKX DEX History
 through `H.skill.gateway.trackOrder`. H Wallet only creates a `trade-success`

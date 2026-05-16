@@ -75,32 +75,6 @@ export type CardConfirmationResult = {
   } | null
 }
 
-export type TradeExecutionHandoffInput = {
-  chain?: string
-  chainIndex?: string
-  executor?: string
-  isFromMyProject?: boolean
-  provider?: string
-  txHash: string
-}
-
-export type TradeExecutionHandoff = {
-  chain?: string
-  chainIndex?: string
-  executor: string
-  isFromMyProject: boolean
-  provider: string
-  receivedAt: string
-  status: 'broadcasted'
-  txHash: string
-}
-
-export type TradeExecutionHandoffResult = {
-  card: ConversationCard
-  execution: TradeExecutionHandoff
-  status: 'recorded' | 'already-recorded'
-}
-
 export type TradeResultVerificationInput = {
   chain?: string
   chainIndex?: string

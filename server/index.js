@@ -95,6 +95,7 @@ const {
 } = require('./services/adminAuditLogService')
 const { getOkxIntegrationStatus } = require('./services/okxIntegrationService')
 const { requireAdminRequest } = require('./http/adminAuth')
+const { requireExecutionRequest } = require('./http/executionAuth')
 const { readJsonBody, sendJson } = require('./http/json')
 
 const port = Number(process.env.PORT ?? 3000)
@@ -404,6 +405,7 @@ async function handleRequest(request, response) {
       request.method === 'POST' &&
       routePath.match(/^\/cards\/[^/]+\/execution-handoff$/)
     ) {
+      requireExecutionRequest(request)
       const cardId = routePath.split('/')[2]
       const body = await readJsonBody(request)
 

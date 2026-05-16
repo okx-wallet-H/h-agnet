@@ -1,7 +1,6 @@
 import type {
   CardLibraryStats,
   ConversationCard,
-  TradeExecutionHandoffInput,
   TradeResultVerificationInput,
 } from './types'
 import {
@@ -37,16 +36,6 @@ export async function prepareConversationCardForConfirmation(cardId: string) {
 
 export async function confirmConversationCard(cardId: string) {
   return cardLibraryApi.confirmCard(cardId)
-}
-
-export async function recordTradeExecutionHandoff({
-  cardId,
-  input,
-}: {
-  cardId: string
-  input: TradeExecutionHandoffInput
-}) {
-  return cardLibraryApi.recordTradeExecutionHandoff(cardId, input)
 }
 
 export async function verifyTradeResult({
