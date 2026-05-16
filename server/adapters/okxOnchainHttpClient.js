@@ -137,7 +137,7 @@ async function getSignalSupportedChains() {
 
 async function getSignalList(input = {}) {
   return request('POST', '/api/v6/dex/market/signal/list', {
-    chainIndex: normalizeChainIndex(input.chainIndex ?? input.chain),
+    chainIndex: normalizeChainIndex(input.chainIndex || input.chain),
     walletType: normalizeOptionalText(input.walletType) ?? '1,2,3',
     limit: normalizeOptionalText(input.limit) ?? '10',
     cursor: input.cursor,
