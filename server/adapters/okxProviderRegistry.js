@@ -132,6 +132,23 @@ function getHSkillBindingStatus(wrapper) {
   }
 
   const contractReady = wrapper.status === 'contract-ready'
+  const localRuntimeReady = getLocalRuntimeStatus(wrapper)
+
+  if (localRuntimeReady) {
+    return {
+      adapterStatus: localRuntimeReady.adapterStatus,
+      credentialBoundary: provider.credentialBoundary,
+      credentialLabel: provider.credentialLabel,
+      hSkillWrapperId: wrapper.id,
+      requiredProviderMethod: null,
+      providerSkill: wrapper.providerSkill,
+      providerLabel: provider.label,
+      reason: localRuntimeReady.reason,
+      status: contractReady ? 'ready' : 'blocked',
+      wrapperStatus: wrapper.status,
+    }
+  }
+
   const requiredProviderMethod = getWrapperRequiredProviderMethod(wrapper.id)
   const methodReady =
     !requiredProviderMethod ||
@@ -155,6 +172,18 @@ function getHSkillBindingStatus(wrapper) {
     status: contractReady && adapterReady ? 'ready' : 'blocked',
     wrapperStatus: wrapper.status,
   }
+}
+
+function getLocalRuntimeStatus(wrapper) {
+  if (wrapper.id === 'H.skill.strategy.composePlan') {
+    return {
+      adapterStatus: 'local-runtime',
+      reason:
+        'H Wallet 本地策略组合运行时已就绪；这里只生成 OKX Skill 调用计划，不执行资产动作。',
+    }
+  }
+
+  return null
 }
 
 function listEnvironmentRequirements() {
