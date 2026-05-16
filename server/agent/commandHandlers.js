@@ -251,12 +251,20 @@ function buildStrategyPreflightInput(content) {
   const token =
     tokenSymbol !== '待选择' ? tokenSymbol : extractLikelyTokenSymbol(content)
 
-  return {
+  return compactPreflightInput({
     chain: chain === '待选择' ? undefined : chain,
     operation: 'buy',
     token: token || undefined,
     tokenAddress: tokenAddress || undefined,
-  }
+  })
+}
+
+function compactPreflightInput(input) {
+  return Object.fromEntries(
+    Object.entries(input).filter(
+      ([, value]) => value !== undefined && value !== null && value !== '',
+    ),
+  )
 }
 
 function extractLikelyTokenSymbol(content) {

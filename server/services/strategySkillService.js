@@ -619,10 +619,12 @@ function summarizePreflightInput(input) {
   }
 
   return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [
-      key,
-      typeof value === 'string' ? value.slice(0, 80) : typeof value,
-    ]),
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value.slice(0, 80) : typeof value,
+      ]),
   )
 }
 
