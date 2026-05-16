@@ -120,6 +120,19 @@ POST /api/h/v1/agent/skill-runtime/invoke
 Dry-run validates wrapper identity, records an invocation, and returns a blocked
 result. It does not call OKX, OnchainOS, wallets, or provider APIs.
 
+Runner preflight uses:
+
+```txt
+POST /api/h/v1/agent/runs/:runId/preflight
+```
+
+This endpoint calls only currently available read-only or preflight H Skill
+wrappers. It may read wallet context, market trends, onchain signals, token
+profile, token-scan, or swap quote when enough input is provided. It skips
+asset-changing wrappers such as swap execution, DeFi deposit, reward claim, and
+broadcast. The response writes a runner-status card to the Card Library so the
+chat can show a simple Chinese card instead of exposing provider complexity.
+
 The first strategy-composition wrappers are:
 
 ```txt

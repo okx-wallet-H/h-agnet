@@ -7,6 +7,7 @@ import type {
   HSkillRuntimeStatus,
   HSkillWrapper,
   OfficialStrategySkill,
+  StrategyPreflightResult,
   StartStrategySkillResult,
   StrategyPlanResult,
   StrategyRun,
@@ -33,6 +34,10 @@ export type StrategySkillApi = {
   startOfficialStrategy: (
     strategyId: string,
   ) => Promise<StartStrategySkillResult>
+  runStrategyPreflight: (
+    runId: string,
+    input?: Record<string, unknown>,
+  ) => Promise<StrategyPreflightResult>
 }
 
 export const strategySkillApi: StrategySkillApi = {
@@ -72,6 +77,12 @@ export const strategySkillApi: StrategySkillApi = {
   startOfficialStrategy(strategyId) {
     return apiRequest(`/agent/strategies/${strategyId}/start`, {
       method: 'POST',
+    })
+  },
+  runStrategyPreflight(runId, input = {}) {
+    return apiRequest(`/agent/runs/${runId}/preflight`, {
+      method: 'POST',
+      body: { input },
     })
   },
 }

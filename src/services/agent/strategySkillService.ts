@@ -45,3 +45,10 @@ export function listStrategyRuns() {
 export function startOfficialStrategy(strategyId: string) {
   return strategySkillApi.startOfficialStrategy(strategyId)
 }
+
+export function runStrategyPreflight(
+  runId: string,
+  input?: Record<string, unknown>,
+) {
+  return strategySkillApi.runStrategyPreflight(runId, input)
+}

@@ -8,6 +8,7 @@ const {
   evaluateAgentAuthorization,
 } = require('./agentAuthorizationPolicyService')
 const { createCard } = require('./cardsService')
+const { invokeHSkill } = require('./hSkillRuntimeService')
 
 const runnerStates = [
   {
@@ -291,6 +292,338 @@ function startOfficialStrategySkill(input) {
   }
 }
 
+async function runOfficialStrategyPreflight(input) {
+  const runId = validateStrategyId(input?.runId)
+  const run = strategySkillRepository.findRunById(runId)
+
+  if (!run) {
+    const error = new Error('策略运行记录不存在。')
+    error.statusCode = 404
+    error.code = 'strategy-run-not-found'
+    throw error
+  }
+
+  const strategy = enrichStrategyWithOkxSkillComposition(
+    strategySkillRepository.findStrategyById(run.strategyId),
+  )
+
+  if (!strategy) {
+    const error = new Error('策略不存在或未开放。')
+    error.statusCode = 404
+    error.code = 'strategy-not-found'
+    throw error
+  }
+
+  const preflight = await invokePreflightWrappers({
+    input: input?.input ?? {},
+    run,
+    strategy,
+  })
+  const nextRun = updateRunAfterPreflight({ preflight, run })
+  const card = createStrategyPreflightCard({
+    preflight,
+    run: nextRun,
+    strategy,
+  })
+
+  return {
+    run: nextRun,
+    strategy,
+    card,
+    preflight,
+  }
+}
+
+async function invokePreflightWrappers({ input, run, strategy }) {
+  const results = []
+
+  for (const wrapperId of strategy.requiredSkillWrappers) {
+    const invocationInput = getPreflightInvocationInput({
+      input,
+      strategy,
+      wrapperId,
+    })
+
+    if (!invocationInput) {
+      results.push(createWaitingPreflightResult(wrapperId))
+      continue
+    }
+
+    const invocationResult = await invokeHSkill({
+      input: invocationInput,
+      wrapperId,
+    })
+    const invocation = invocationResult.invocation
+
+    results.push({
+      wrapperId,
+      invocationId: invocation.id,
+      status: invocation.result.ok ? 'completed' : 'blocked',
+      code: invocation.result.code,
+      message: invocation.result.message,
+      stage: inferExecutionStage(wrapperId),
+    })
+  }
+
+  const completedCount = results.filter(
+    (item) => item.status === 'completed',
+  ).length
+  const blockedCount = results.filter((item) => item.status === 'blocked').length
+  const waitingCount = results.filter((item) => item.status === 'waiting').length
+
+  return {
+    blockedCount,
+    completedCount,
+    inputSummary: summarizePreflightInput(input),
+    results,
+    runId: run.id,
+    strategyId: strategy.id,
+    strategyVersion: strategy.version,
+    waitingCount,
+  }
+}
+
+function getPreflightInvocationInput({ input, strategy, wrapperId }) {
+  if (wrapperId === 'H.skill.strategy.composePlan') {
+    return { strategyId: strategy.id }
+  }
+
+  if (wrapperId === 'H.skill.wallet.getPortfolio') {
+    return {}
+  }
+
+  if (wrapperId === 'H.skill.market.readDexTrends') {
+    return {
+      strategyId: strategy.id,
+      limit: normalizePreflightText(input.marketLimit) || '5',
+    }
+  }
+
+  if (wrapperId === 'H.skill.signal.readOnchainSignals') {
+    return {
+      strategyId: strategy.id,
+      limit: normalizePreflightText(input.signalLimit) || '5',
+    }
+  }
+
+  if (wrapperId === 'H.skill.token.analyzeRisk') {
+    const tokenInput = getPreflightTokenInput(input)
+
+    if (!tokenInput) {
+      return null
+    }
+
+    return {
+      ...tokenInput,
+      limit: normalizePreflightText(input.tokenLimit) || '5',
+    }
+  }
+
+  if (wrapperId === 'H.skill.risk.scanTransaction') {
+    const tokenInput = getPreflightTokenInput(input)
+
+    if (!tokenInput?.tokenAddress) {
+      return null
+    }
+
+    return {
+      chain: tokenInput.chain,
+      chainIndex: tokenInput.chainIndex,
+      operation: normalizePreflightText(input.operation) || 'buy',
+      tokenAddress: tokenInput.tokenAddress,
+    }
+  }
+
+  if (wrapperId === 'H.skill.swap.quote') {
+    const quoteInput = getPreflightQuoteInput(input)
+
+    return quoteInput
+  }
+
+  return null
+}
+
+function getPreflightTokenInput(input) {
+  const tokenAddress =
+    normalizePreflightText(input.tokenAddress) ||
+    normalizePreflightText(input.contractAddress) ||
+    normalizePreflightText(input.address)
+  const token = normalizePreflightText(input.token)
+  const chain = normalizePreflightText(input.chain)
+  const chainIndex = normalizePreflightText(input.chainIndex)
+
+  if ((!token && !tokenAddress) || (!chain && !chainIndex)) {
+    return null
+  }
+
+  return {
+    chain,
+    chainIndex,
+    token,
+    tokenAddress,
+  }
+}
+
+function getPreflightQuoteInput(input) {
+  const chain = normalizePreflightText(input.chain)
+  const chainIndex = normalizePreflightText(input.chainIndex)
+  const fromTokenAddress = normalizePreflightText(input.fromTokenAddress)
+  const toTokenAddress = normalizePreflightText(input.toTokenAddress)
+  const amount = normalizePreflightText(input.amountRaw) || normalizePreflightText(input.amount)
+
+  if ((!chain && !chainIndex) || !fromTokenAddress || !toTokenAddress || !amount) {
+    return null
+  }
+
+  return {
+    amount,
+    chain,
+    chainIndex,
+    fromTokenAddress,
+    swapMode: 'exactIn',
+    toTokenAddress,
+  }
+}
+
+function createWaitingPreflightResult(wrapperId) {
+  return {
+    wrapperId,
+    status: 'waiting',
+    code: 'preflight-input-required',
+    message: getPreflightWaitingMessage(wrapperId),
+    stage: inferExecutionStage(wrapperId),
+  }
+}
+
+function getPreflightWaitingMessage(wrapperId) {
+  const waitingMessages = {
+    'H.skill.token.analyzeRisk': '等待 token + chain 输入后读取代币画像。',
+    'H.skill.risk.scanTransaction': '等待合约地址后执行 OKX Security Token Scan。',
+    'H.skill.swap.quote': '等待完整换币意图后获取 OKX Swap 报价。',
+    'H.skill.swap.execute': '资产动作不会在只读预检中执行。',
+    'H.skill.gateway.simulate': '等待 OKX swap data 后执行链上模拟。',
+    'H.skill.defi.deposit': 'DeFi 存入不会在只读预检中执行。',
+    'H.skill.defi.claim': '收益领取不会在只读预检中执行。',
+  }
+
+  return waitingMessages[wrapperId] ?? '该步骤等待更完整的策略上下文。'
+}
+
+function updateRunAfterPreflight({ preflight, run }) {
+  const hasBlockedPreflight = preflight.blockedCount > 0
+  const nextStatus = hasBlockedPreflight ? 'blocked' : 'planning'
+  const stateLabel = hasBlockedPreflight ? '预检暂停' : '预检完成'
+  const blockReason = hasBlockedPreflight
+    ? getFirstBlockedPreflightReason(preflight)
+    : '只读预检已完成；真实执行仍等待授权、交易数据、模拟和回执链路。'
+  const nextStep = hasBlockedPreflight
+    ? '先处理预检阻断项，再继续生成执行卡片。'
+    : '等待完整交易意图或策略产品输入后进入下一张执行卡。'
+
+  return strategySkillRepository.updateRun(run.id, (currentRun) => ({
+    ...currentRun,
+    blockReason,
+    executionMode: 'preflight-only',
+    nextStep,
+    preflight,
+    stateLabel,
+    status: nextStatus,
+    steps: currentRun.steps.map((step) => {
+      if (step.id === 'planning') {
+        return {
+          ...step,
+          detail: `只读预检完成 ${preflight.completedCount} 项，等待 ${preflight.waitingCount} 项。`,
+          status: 'done',
+        }
+      }
+
+      if (step.id === 'executing') {
+        return {
+          ...step,
+          detail: blockReason,
+          status: hasBlockedPreflight ? 'blocked' : 'waiting',
+        }
+      }
+
+      return step
+    }),
+    updatedAt: nowIso(),
+  }))
+}
+
+function createStrategyPreflightCard({ preflight, run, strategy }) {
+  const status = preflight.blockedCount > 0 ? 'blocked' : 'pending-execution'
+
+  return createCard({
+    type: 'system-status',
+    status,
+    source: 'ai-agent',
+    title: `${strategy.name} 预检快照`,
+    summary:
+      'Agent 已执行当前可用的只读 H Skill 预检。它只读取 OKX / OnchainOS 数据，不签名、不广播、不声称收益。',
+    metrics: [
+      { label: '预检能力', value: `${preflight.results.length} 个`, tone: 'gold' },
+      { label: '已完成', value: `${preflight.completedCount} 个`, tone: 'success' },
+      { label: '等待输入', value: `${preflight.waitingCount} 个`, tone: 'muted' },
+      { label: '阻断项', value: `${preflight.blockedCount} 个`, tone: preflight.blockedCount ? 'danger' : 'gold' },
+      { label: '执行状态', value: '未广播', tone: 'danger' },
+      { label: '下一步', value: run.nextStep, tone: 'gold' },
+      { label: '当前状态', value: status === 'blocked' ? '已阻止' : '待执行', tone: status === 'blocked' ? 'danger' : 'gold' },
+    ],
+    metadata: {
+      runnerStatus: {
+        blockReason: run.blockReason,
+        nextStep: run.nextStep,
+        preflight,
+        runId: run.id,
+        state: run.status,
+        stateLabel: run.stateLabel,
+        steps: run.steps,
+      },
+      strategyId: strategy.id,
+      strategyName: strategy.name,
+      strategyVersion: strategy.version,
+    },
+    tags: [
+      'agent',
+      'earning-agent',
+      'runner-status',
+      'preflight',
+      'not-broadcast',
+      'okx-skill-composition',
+      `strategy:${strategy.id}`,
+      `run:${run.id}`,
+    ],
+  })
+}
+
+function getFirstBlockedPreflightReason(preflight) {
+  const blocked = preflight.results.find((item) => item.status === 'blocked')
+
+  return blocked
+    ? `${blocked.stage} 未通过：${blocked.message}`
+    : '只读预检未通过。'
+}
+
+function summarizePreflightInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? value.slice(0, 80) : typeof value,
+    ]),
+  )
+}
+
+function normalizePreflightText(input) {
+  return typeof input === 'string' && input.trim().length > 0
+    ? input.trim()
+    : ''
+}
+
 function getRunStateLabel(status) {
   const labels = {
     blocked: '已阻止',
@@ -522,5 +855,6 @@ module.exports = {
   listHSkillWrappers,
   listOfficialStrategySkills,
   listStrategyRuns,
+  runOfficialStrategyPreflight,
   startOfficialStrategySkill,
 }

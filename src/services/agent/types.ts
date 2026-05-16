@@ -192,7 +192,7 @@ export type StrategyRun = {
   strategyVersion: string
   status: AgentRunnerState
   createdAt: string
-  executionMode: 'draft-only'
+  executionMode: 'draft-only' | 'preflight-only'
   requiredSkillWrappers: string[]
   executionPlan: AgentExecutionPlanStep[]
   okxSkillComposition?: OkxSkillCompositionStep[]
@@ -207,6 +207,29 @@ export type StartStrategySkillResult = {
   run: StrategyRun
   strategy: OfficialStrategySkill
   card: ConversationCard
+}
+
+export type StrategyPreflightResult = {
+  run: StrategyRun
+  strategy: OfficialStrategySkill
+  card: ConversationCard
+  preflight: {
+    blockedCount: number
+    completedCount: number
+    inputSummary: Record<string, string>
+    results: Array<{
+      wrapperId: string
+      invocationId?: string
+      status: 'completed' | 'blocked' | 'waiting'
+      code: string
+      message: string
+      stage: string
+    }>
+    runId: string
+    strategyId: string
+    strategyVersion: string
+    waitingCount: number
+  }
 }
 
 export type AgentRunnerStatus = {

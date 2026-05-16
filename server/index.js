@@ -61,6 +61,7 @@ const {
   listHSkillWrappers,
   listOfficialStrategySkills,
   listStrategyRuns,
+  runOfficialStrategyPreflight,
   startOfficialStrategySkill,
 } = require('./services/strategySkillService')
 const {
@@ -276,6 +277,23 @@ async function handleRequest(request, response) {
       sendJson(response, 200, {
         ok: true,
         data: startOfficialStrategySkill({ strategyId }),
+      })
+      return
+    }
+
+    if (
+      request.method === 'POST' &&
+      routePath.match(/^\/agent\/runs\/[^/]+\/preflight$/)
+    ) {
+      const runId = routePath.split('/')[3]
+      const body = await readJsonBody(request)
+
+      sendJson(response, 200, {
+        ok: true,
+        data: await runOfficialStrategyPreflight({
+          runId,
+          input: body?.input ?? body ?? {},
+        }),
       })
       return
     }

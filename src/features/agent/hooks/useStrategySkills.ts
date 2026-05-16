@@ -11,6 +11,7 @@ import {
   listHSkillInvocations,
   listOfficialStrategies,
   listStrategyRuns,
+  runStrategyPreflight,
   startOfficialStrategy,
 } from '../../../services/agent'
 
@@ -131,6 +132,26 @@ export function useStartOfficialStrategy() {
 
   return useMutation({
     mutationFn: startOfficialStrategy,
+    onSuccess() {
+      void queryClient.invalidateQueries({
+        queryKey: strategySkillKeys.all,
+      })
+      void queryClient.invalidateQueries({ queryKey: ['card-library'] })
+    },
+  })
+}
+
+export function useRunStrategyPreflight() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      input,
+      runId,
+    }: {
+      input?: Record<string, unknown>
+      runId: string
+    }) => runStrategyPreflight(runId, input),
     onSuccess() {
       void queryClient.invalidateQueries({
         queryKey: strategySkillKeys.all,
