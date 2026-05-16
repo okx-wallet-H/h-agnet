@@ -32,6 +32,7 @@ Ready now:
 * OKX DEX quote adapter boundary
 * OKX DEX swap-data adapter boundary
 * OKX DEX Hot Token market-trend adapter boundary
+* OKX Security Token Scan risk-gate adapter boundary
 * OKX Transaction API simulation adapter boundary
 * OKX DEX transaction status tracking boundary
 
@@ -138,6 +139,7 @@ Official OKX Onchain endpoints:
 * Swap data: `GET /api/v6/dex/aggregator/swap`
 * Transaction status: `GET /api/v6/dex/aggregator/history`
 * DEX market trends: `GET /api/v6/dex/market/token/hot-token`
+* Token security scan: `POST /api/v6/security/token-scan`
 
 These calls stay server-side behind H Wallet APIs.
 
@@ -161,6 +163,12 @@ H.skill.market.readDexTrends
 → OKX Hot Token response
 → H Wallet normalized market trend rows
 → read-only strategy input
+
+H.skill.risk.scanTransaction
+→ token-scan input: chain + contract token address
+→ server-only OKX signed request
+→ OKX Security riskLevel
+→ H Wallet normalized risk gate action
 ```
 
 Quote failures, missing token contract addresses, or provider errors return a
@@ -179,6 +187,11 @@ access. Any failed simulation remains blocked and cannot be treated as safe.
 Transaction status tracking uses `chainIndex + txHash` and returns provider
 status such as `pending`, `success`, or `fail`. A missing or failed status query
 must remain blocked; H Wallet must not infer success from local state.
+
+The first OKX Security adapter is token-scan only. It can block, warn, require
+confirmation, or allow based on OKX's returned `riskLevel`. Transaction calldata
+security scanning must use a later tx-scan adapter and remains blocked until
+that method is connected.
 
 ## Manual Preflight For Later
 

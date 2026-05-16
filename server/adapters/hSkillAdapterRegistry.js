@@ -81,11 +81,17 @@ const adapterDefinitions = [
     wrapperId: 'H.skill.risk.scanTransaction',
     providerSkill: 'okx-security',
     providerMethod: 'tokenScan',
-    adapterStatus: 'adapter-shell',
+    adapterStatus: 'ready',
     executionMode: 'risk-gate',
     assetImpact: 'none',
     failStrategy: 'block-on-error',
     userVisibleMode: 'collapsible-process',
+    docs: [
+      {
+        label: 'OKX Agentic Wallet Security Detection',
+        url: 'https://web3.okx.com/onchainos/dev-docs/wallet/agentic-wallet-skills',
+      },
+    ],
   },
   {
     wrapperId: 'H.skill.gateway.simulate',

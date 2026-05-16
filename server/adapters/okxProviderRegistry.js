@@ -96,6 +96,12 @@ const providerDefinitions = [
     transport: 'okx-onchainos-adapter',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: '交易、签名、Token 和 DApp 风险扫描',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation:
+          '当前开放 token-scan 风控输入；tx-scan、sig-scan、dapp-scan 和 approvals 后续独立接入。',
+        supportedMethods: getReadyProviderMethods('okx-security'),
+      }),
   },
   {
     id: 'okx-onchain-gateway',

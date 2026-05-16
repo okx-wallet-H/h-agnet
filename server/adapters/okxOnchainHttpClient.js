@@ -22,6 +22,18 @@ const chainIndexByAlias = {
   '42161': '42161',
   arb: '42161',
   arbitrum: '42161',
+  '43114': '43114',
+  avalanche: '43114',
+  avax: '43114',
+  '10': '10',
+  optimism: '10',
+  op: '10',
+  '324': '324',
+  zksync: '324',
+  '59144': '59144',
+  linea: '59144',
+  '534352': '534352',
+  scroll: '534352',
   '501': '501',
   sol: '501',
   solana: '501',
@@ -156,6 +168,13 @@ async function searchTokens(input = {}) {
     search: normalizeRequiredText(input.search ?? input.token, 'search'),
     cursor: input.cursor,
     limit: normalizeOptionalText(input.limit) ?? '20',
+  })
+}
+
+async function scanTokens(input = {}) {
+  return request('POST', '/api/v6/security/token-scan', {
+    source: normalizeOptionalText(input.source) ?? 'onchain_os_cli',
+    tokenList: normalizeTokenScanList(input),
   })
 }
 
@@ -338,6 +357,54 @@ function normalizeChainIndex(input) {
   return chainIndex
 }
 
+function normalizeTokenScanList(input) {
+  const list = getRawTokenScanList(input)
+
+  if (list.length === 0) {
+    const error = new Error('tokenList 不能为空。')
+    error.code = 'okx-token-scan-token-list-required'
+    throw error
+  }
+
+  return list.map((item, index) => ({
+    chainId: normalizeChainIndex(item.chainId ?? item.chainIndex ?? item.chain),
+    contractAddress: normalizeRequiredText(
+      item.contractAddress ?? item.tokenAddress ?? item.address,
+      `tokenList[${index}].contractAddress`,
+    ),
+  }))
+}
+
+function getRawTokenScanList(input) {
+  if (Array.isArray(input.tokenList)) {
+    return input.tokenList
+  }
+
+  if (Array.isArray(input.tokens)) {
+    return input.tokens
+  }
+
+  const tokenPairs = normalizeOptionalText(input.tokens)
+
+  if (tokenPairs) {
+    return tokenPairs.split(',').map((pair) => {
+      const [chainId, contractAddress] = pair.split(':')
+
+      return { chainId, contractAddress }
+    })
+  }
+
+  return [
+    {
+      chain: input.chain,
+      chainId: input.chainId,
+      chainIndex: input.chainIndex,
+      contractAddress:
+        input.contractAddress ?? input.tokenAddress ?? input.address,
+    },
+  ].filter((item) => item.contractAddress)
+}
+
 function normalizeRequiredText(input, fieldName) {
   const value = normalizeOptionalText(input)
 
@@ -404,6 +471,7 @@ module.exports = {
   getSignalSupportedChains,
   getStatus,
   searchTokens,
+  scanTokens,
   getSwapData,
   getSwapHistory,
   getSwapQuote,

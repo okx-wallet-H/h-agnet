@@ -145,10 +145,17 @@ into H Wallet market trend rows, and records the invocation. If OKX returns a
 non-success code, an empty response, or a provider error, H Wallet must not
 invent market data.
 
-The first risk-gate invoke target is `H.skill.risk.scanTransaction`. It maps to
-`okx-security` / `onchainos security tx-scan`. Until the real adapter is
-connected, the wrapper must return a blocked fail-safe result. A missing or
-failed risk scan is never treated as safe.
+The first risk-gate invoke target is `H.skill.risk.scanTransaction`. Its first
+connected provider method is `okx-security` / token-scan through
+`/api/v6/security/token-scan`. This scans contract tokens and normalizes OKX's
+authoritative `riskLevel` into H Wallet actions: `allow`, `warn`,
+`require-confirmation`, or `block`.
+
+Transaction-level `tx-scan`, signature scan, DApp scan, and approval monitoring
+are separate OKX Security methods and remain locked until their adapters are
+connected. If the wrapper receives transaction calldata before tx-scan is
+available, it must return a blocked fail-safe result. A missing or failed risk
+scan is never treated as safe.
 
 The first simulation-gate invoke target is `H.skill.gateway.simulate`. It maps
 to `okx-onchain-gateway` / OKX Transaction API simulation. A missing, rejected,

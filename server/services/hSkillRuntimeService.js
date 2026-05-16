@@ -10,6 +10,30 @@ const {
   evaluateAgentAuthorization,
 } = require('./agentAuthorizationPolicyService')
 
+const tokenRiskLabelMap = {
+  isHoneypot: '貔貅盘 / 无法卖出',
+  isRubbishAirdrop: '垃圾空投',
+  isAirdropScam: 'Gas Mint 诈骗',
+  isHasAssetEditAuth: '资产编辑权限',
+  isLowLiquidity: '低流动性',
+  isDumping: '大额抛售',
+  isLiquidityRemoval: '移除流动性',
+  isPump: '异常拉盘',
+  isWash: '刷量交易',
+  isFakeLiquidity: '虚假流动性',
+  isWash2: '刷量交易',
+  isFundLinkage: '风险资金关联',
+  isVeryLowLpBurn: 'LP 销毁比例过低',
+  isVeryHighLpHolderProp: 'LP 持仓过度集中',
+  isHasBlockingHis: '历史冻结记录',
+  isOverIssued: '超发风险',
+  isCounterfeit: '仿冒代币',
+  isNotOpenSource: '合约未开源',
+  isMintable: '可增发',
+  isHasFrozenAuth: '冻结权限',
+  isNotRenounced: '未放弃所有权',
+}
+
 function getHSkillRuntimeStatus() {
   const wrappers = strategySkillRepository.listHSkillWrappers()
   const invocations = strategySkillRepository.listHSkillInvocations()
@@ -194,27 +218,94 @@ async function invokeRiskScanTransaction(wrapper, input) {
       message: validation.message,
       resultData: {
         riskGate: 'blocked',
-        scanType: 'tx-scan',
+        scanType: validation.scanMode ?? 'unknown',
         action: 'block',
         reason: validation.message,
       },
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'security-adapter-not-connected',
-    message:
-      '交易风险扫描协议已识别；真实 okx-security tx-scan adapter 尚未接入。扫描失败不能视为安全通过。',
-    resultData: {
-      riskGate: 'blocked',
-      scanType: 'tx-scan',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-security',
-    },
-  })
+  if (validation.scanMode !== 'token-scan') {
+    return recordBlockedInvocation({
+      wrapper,
+      input,
+      code: 'security-tx-scan-adapter-not-connected',
+      message:
+        '交易级 tx-scan 协议已识别；真实 okx-security tx-scan adapter 尚未接入。扫描失败不能视为安全通过。',
+      resultData: {
+        riskGate: 'blocked',
+        scanType: 'tx-scan',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-security',
+      },
+    })
+  }
+
+  try {
+    const requestInput = mapRiskTokenScanInput(input)
+    const output = await okxOnchainHttpClient.scanTokens(requestInput)
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-security-token-scan-rejected',
+        message:
+          'OKX Security Token Scan 未返回成功结果，H Wallet 不把失败扫描当作安全通过。',
+        resultData: {
+          riskGate: 'blocked',
+          scanType: 'token-scan',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    const tokenRisks = normalizeOkxTokenScanResults(
+      output.response,
+      requestInput.operation,
+    )
+    const aggregate = summarizeTokenRiskGate(tokenRisks)
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-security-token-scan-completed',
+      executionMode: 'risk-gate',
+      message: getRiskScanMessage(aggregate),
+      resultData: {
+        riskGate: aggregate.gate,
+        scanType: 'token-scan',
+        action: aggregate.action,
+        provider: 'okx-security',
+        source: 'okx-onchainos-api',
+        request: output.request,
+        operation: requestInput.operation,
+        tokenCount: tokenRisks.length,
+        highestRiskLevel: aggregate.highestRiskLevel,
+        tokenRisks,
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-security-token-scan-error',
+      fallbackMessage:
+        'OKX Security Token Scan 请求失败。H Wallet 不把失败扫描当作安全通过。',
+      error,
+      resultData: {
+        riskGate: 'blocked',
+        scanType: 'token-scan',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-security',
+      },
+    })
+  }
 }
 
 async function invokeStrategyComposePlan(wrapper, input) {
@@ -972,17 +1063,22 @@ function validateRiskScanInput(input) {
     }
   }
 
-  const chain = typeof input.chain === 'string' ? input.chain.trim() : ''
-  const transaction =
-    typeof input.transaction === 'string' ? input.transaction.trim() : ''
-  const calldata =
-    typeof input.calldata === 'string' ? input.calldata.trim() : ''
+  const tokenScanValidation = validateRiskTokenScanInput(input)
+
+  if (tokenScanValidation.ok || tokenScanValidation.hasTokenScanInput) {
+    return tokenScanValidation
+  }
+
+  const chain = normalizeString(input.chain) || normalizeString(input.chainIndex)
+  const transaction = normalizeString(input.transaction)
+  const calldata = normalizeString(input.calldata) || normalizeString(input.data)
 
   if (!chain) {
     return {
       ok: false,
       code: 'risk-scan-chain-required',
-      message: '风险扫描需要 chain。',
+      message: '交易级风险扫描需要 chain 或 chainIndex。',
+      scanMode: 'tx-scan',
     }
   }
 
@@ -990,11 +1086,122 @@ function validateRiskScanInput(input) {
     return {
       ok: false,
       code: 'risk-scan-transaction-required',
-      message: '风险扫描需要 transaction 或 calldata。',
+      message:
+        '风险扫描需要 tokenList / tokenAddress，或 transaction / calldata。',
+      scanMode: 'unknown',
     }
   }
 
-  return { ok: true }
+  return { ok: true, scanMode: 'tx-scan' }
+}
+
+function validateRiskTokenScanInput(input) {
+  const tokenList = Array.isArray(input.tokenList) ? input.tokenList : null
+  const tokenArray = Array.isArray(input.tokens) ? input.tokens : null
+  const tokenPairs =
+    typeof input.tokens === 'string' && input.tokens.trim().length > 0
+      ? input.tokens.trim()
+      : ''
+  const tokenAddress =
+    normalizeString(input.tokenAddress) ||
+    normalizeString(input.contractAddress) ||
+    normalizeString(input.address)
+  const chain =
+    normalizeString(input.chainId) ||
+    normalizeString(input.chainIndex) ||
+    normalizeString(input.chain)
+  const hasTokenScanInput = Boolean(
+    tokenList?.length || tokenArray?.length || tokenPairs || tokenAddress,
+  )
+
+  if (!hasTokenScanInput) {
+    return { ok: false, hasTokenScanInput: false }
+  }
+
+  if (tokenAddress && !chain) {
+    return {
+      ok: false,
+      code: 'risk-token-scan-chain-required',
+      message: 'Token 风险扫描需要 chain、chainIndex 或 chainId。',
+      hasTokenScanInput: true,
+      scanMode: 'token-scan',
+    }
+  }
+
+  const list = tokenList ?? tokenArray
+
+  if (list) {
+    if (list.length > 50) {
+      return {
+        ok: false,
+        code: 'risk-token-scan-too-many-tokens',
+        message: 'Token 风险扫描一次最多支持 50 个 token。',
+        hasTokenScanInput: true,
+        scanMode: 'token-scan',
+      }
+    }
+
+    for (const [index, item] of list.entries()) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return {
+          ok: false,
+          code: 'risk-token-scan-invalid-token',
+          message: `tokenList[${index}] 必须包含 chain 和 contractAddress。`,
+          hasTokenScanInput: true,
+          scanMode: 'token-scan',
+        }
+      }
+
+      const itemAddress =
+        normalizeString(item.contractAddress) ||
+        normalizeString(item.tokenAddress) ||
+        normalizeString(item.address)
+      const itemChain =
+        normalizeString(item.chainId) ||
+        normalizeString(item.chainIndex) ||
+        normalizeString(item.chain)
+
+      if (!itemAddress || !itemChain) {
+        return {
+          ok: false,
+          code: 'risk-token-scan-token-fields-required',
+          message: `tokenList[${index}] 需要 chain 和 contractAddress。`,
+          hasTokenScanInput: true,
+          scanMode: 'token-scan',
+        }
+      }
+    }
+  }
+
+  if (tokenPairs) {
+    const pairs = tokenPairs.split(',').map((item) => item.trim())
+
+    if (pairs.length > 50) {
+      return {
+        ok: false,
+        code: 'risk-token-scan-too-many-tokens',
+        message: 'Token 风险扫描一次最多支持 50 个 token。',
+        hasTokenScanInput: true,
+        scanMode: 'token-scan',
+      }
+    }
+
+    for (const pair of pairs) {
+      const [pairChain, pairAddress] = pair.split(':')
+
+      if (!normalizeString(pairChain) || !normalizeString(pairAddress)) {
+        return {
+          ok: false,
+          code: 'risk-token-scan-invalid-pair',
+          message: 'tokens 需要使用 chainId:contractAddress 格式。',
+          hasTokenScanInput: true,
+          scanMode: 'token-scan',
+        }
+      }
+    }
+  }
+
+  return { ok: true, hasTokenScanInput: true, scanMode: 'token-scan' }
 }
 
 function validateSignalInput(input) {
@@ -1483,6 +1690,266 @@ function validateDefiClaimInput(input) {
   }
 
   return { ok: true }
+}
+
+function mapRiskTokenScanInput(input) {
+  return {
+    operation: normalizeRiskOperation(input.operation ?? input.intent),
+    source: 'onchain_os_cli',
+    tokenList: getRiskTokenScanList(input),
+  }
+}
+
+function getRiskTokenScanList(input) {
+  if (Array.isArray(input.tokenList)) {
+    return input.tokenList.map(mapRiskTokenScanItem)
+  }
+
+  if (Array.isArray(input.tokens)) {
+    return input.tokens.map(mapRiskTokenScanItem)
+  }
+
+  const tokenPairs = normalizeString(input.tokens)
+
+  if (tokenPairs) {
+    return tokenPairs.split(',').map((pair) => {
+      const [chainId, contractAddress] = pair.split(':')
+
+      return {
+        chainId: normalizeString(chainId),
+        contractAddress: normalizeString(contractAddress),
+      }
+    })
+  }
+
+  return [
+    {
+      chain: input.chain,
+      chainId: input.chainId,
+      chainIndex: input.chainIndex,
+      contractAddress:
+        input.contractAddress ?? input.tokenAddress ?? input.address,
+    },
+  ].map(mapRiskTokenScanItem)
+}
+
+function mapRiskTokenScanItem(item) {
+  return {
+    chain:
+      normalizeString(item.chainId) ||
+      normalizeString(item.chainIndex) ||
+      normalizeString(item.chain),
+    contractAddress:
+      normalizeString(item.contractAddress) ||
+      normalizeString(item.tokenAddress) ||
+      normalizeString(item.address),
+  }
+}
+
+function normalizeRiskOperation(input) {
+  const value = normalizeString(input).toLowerCase()
+
+  if (
+    [
+      'sell',
+      'from',
+      'spend',
+      'dispose',
+      'withdraw',
+      'redeem',
+    ].includes(value)
+  ) {
+    return 'sell'
+  }
+
+  if (
+    [
+      'scan',
+      'standalone',
+      'observe',
+      'portfolio',
+      'research',
+    ].includes(value)
+  ) {
+    return 'standalone'
+  }
+
+  return 'buy'
+}
+
+function normalizeOkxTokenScanResults(response, operation) {
+  return getOkxResponseRows(response).map((row, index) =>
+    normalizeOkxTokenScanResult(row, index, operation),
+  )
+}
+
+function normalizeOkxTokenScanResult(row, index, operation) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return {
+      listPosition: index + 1,
+      isChainSupported: false,
+      riskLevel: 'HIGH',
+      riskLevelAssumption: 'malformed-risk-row',
+      operation,
+      action: 'require-confirmation',
+      gate: 'requires-confirmation',
+      reason: 'OKX Security 返回了无法解析的 token 风险记录。',
+      triggeredLabels: [],
+    }
+  }
+
+  const chainSupported = row?.isChainSupported !== false
+  const rawRiskLevel = normalizeString(row?.riskLevel).toUpperCase()
+  const riskLevel = isRecognizedRiskLevel(rawRiskLevel) ? rawRiskLevel : 'HIGH'
+  const riskLevelAssumption = isRecognizedRiskLevel(rawRiskLevel)
+    ? null
+    : rawRiskLevel
+      ? 'unrecognized-risk-level'
+      : 'missing-risk-level'
+  const action = getTokenRiskAction({ chainSupported, operation, riskLevel })
+
+  return removeEmptyFields({
+    listPosition: index + 1,
+    chainId: pickFirst(row, ['chainId', 'chainIndex']),
+    tokenAddress: pickFirst(row, [
+      'tokenAddress',
+      'tokenContractAddress',
+      'contractAddress',
+    ]),
+    isChainSupported: chainSupported,
+    riskLevel,
+    riskLevelAssumption,
+    operation,
+    action: action.action,
+    gate: action.gate,
+    reason: action.reason,
+    triggeredLabels: collectTriggeredRiskLabels(row),
+    buyTaxes: pickFirst(row, ['buyTaxes', 'buyTax']),
+    sellTaxes: pickFirst(row, ['sellTaxes', 'sellTax']),
+  })
+}
+
+function isRecognizedRiskLevel(input) {
+  return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(input)
+}
+
+function getTokenRiskAction({ chainSupported, operation, riskLevel }) {
+  if (!chainSupported) {
+    return {
+      action: 'warn',
+      gate: 'warning',
+      reason: '该链暂不支持 token 安全扫描。',
+    }
+  }
+
+  if (operation === 'sell') {
+    return riskLevel === 'LOW'
+      ? { action: 'allow', gate: 'passed', reason: '未发现高优先级卖出阻断。' }
+      : {
+          action: 'warn',
+          gate: 'warning',
+          reason: '卖出侧发现 token 风险，允许退出但需要展示风险。',
+        }
+  }
+
+  if (riskLevel === 'CRITICAL') {
+    return {
+      action: 'block',
+      gate: 'blocked',
+      reason: '买入侧触发 CRITICAL token 风险。',
+    }
+  }
+
+  if (riskLevel === 'HIGH') {
+    return {
+      action: 'require-confirmation',
+      gate: 'requires-confirmation',
+      reason: '买入侧触发 HIGH token 风险，需要显式确认。',
+    }
+  }
+
+  if (riskLevel === 'MEDIUM') {
+    return {
+      action: 'warn',
+      gate: 'warning',
+      reason: '检测到中等 token 风险，需要向用户展示。',
+    }
+  }
+
+  return { action: 'allow', gate: 'passed', reason: '未检测到 token 风险标签。' }
+}
+
+function collectTriggeredRiskLabels(row) {
+  if (!row || typeof row !== 'object') {
+    return []
+  }
+
+  return Object.entries(tokenRiskLabelMap)
+    .filter(([field]) => row[field] === true)
+    .map(([field, label]) => ({ field, label }))
+}
+
+function summarizeTokenRiskGate(tokenRisks) {
+  if (tokenRisks.length === 0) {
+    return {
+      action: 'block',
+      gate: 'blocked',
+      highestRiskLevel: 'UNKNOWN',
+      priority: 4,
+    }
+  }
+
+  const aggregate = tokenRisks.reduce(
+    (current, item) => {
+      const priority = getRiskActionPriority(item.action)
+
+      if (priority > current.priority) {
+        return {
+          action: item.action,
+          gate: item.gate,
+          highestRiskLevel: item.riskLevel,
+          priority,
+        }
+      }
+
+      return current
+    },
+    {
+      action: 'allow',
+      gate: 'passed',
+      highestRiskLevel: 'LOW',
+      priority: 0,
+    },
+  )
+
+  return aggregate
+}
+
+function getRiskActionPriority(action) {
+  const priorityMap = {
+    allow: 0,
+    warn: 1,
+    'require-confirmation': 2,
+    block: 3,
+  }
+
+  return priorityMap[action] ?? 3
+}
+
+function getRiskScanMessage(aggregate) {
+  if (aggregate.action === 'block') {
+    return 'OKX Security 已完成 Token Scan，发现阻断级风险。'
+  }
+
+  if (aggregate.action === 'require-confirmation') {
+    return 'OKX Security 已完成 Token Scan，发现高风险，需要用户显式确认。'
+  }
+
+  if (aggregate.action === 'warn') {
+    return 'OKX Security 已完成 Token Scan，发现需展示的风险提醒。'
+  }
+
+  return 'OKX Security 已完成 Token Scan，未发现阻断级 token 风险。'
 }
 
 function mapMarketTrendInput(input) {
