@@ -28,7 +28,7 @@ Ready now:
 * Agent Wallet email OTP request route
 * Agent Wallet OTP verify route
 * Wallet transfer / withdraw authorization card draft route
-* Card Library recording for generated cards
+* Conversation card recording for generated cards
 * OKX DEX quote adapter boundary
 * OKX DEX swap-data adapter boundary
 * OKX DEX Hot Token market-trend adapter boundary

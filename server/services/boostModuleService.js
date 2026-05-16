@@ -25,51 +25,41 @@ function listBoostCampaigns() {
 function buildRecommendedActions(stats) {
   const actions = []
 
-  if (stats.confirmations.pending > 0) {
+  if (stats.activeCards === 0) {
     actions.push({
-      id: 'confirm-pending',
-      title: '处理待授权卡',
-      description: '先授权或取消等待中的卡片，让卡库状态更干净。',
+      id: 'start-first-agent-trade',
+      title: '启动第一笔 Agent 交易',
+      description: '回到 AI 对话启动 Agent，交易进入执行通道后会点亮卡库。',
       status: 'ready',
-      source: 'confirmations',
-    })
-  }
-
-  if (stats.activity.boostTasks === 0) {
-    actions.push({
-      id: 'create-boost-task',
-      title: '生成第一张赚币任务卡',
-      description: '从 AI 对话里说“帮我找赚币任务”，激活任务评分。',
-      status: 'ready',
-      source: 'boost',
-    })
-  }
-
-  if (stats.activity.portfolioInsights === 0) {
-    actions.push({
-      id: 'create-insight',
-      title: '做一次资产分析',
-      description: '资产分析卡会帮助后续组合建议更贴近用户。',
-      status: 'ready',
-      source: 'portfolio',
+      source: 'card-library',
     })
   }
 
   if (stats.receipts.pendingExecution > 0) {
     actions.push({
       id: 'wait-execution-layer',
-      title: '等待执行层接入',
-      description: '已有授权回执，但当前仍未广播，不会记为真实成功。',
+      title: '等待执行回执',
+      description: '已有交易进入执行通道，但未验证成功前不会记为真实战绩。',
       status: 'waiting',
       source: 'execution',
+    })
+  }
+
+  if (stats.completion.verifiedResults === 0) {
+    actions.push({
+      id: 'complete-first-trade',
+      title: '完成首个真实战绩',
+      description: '只有 OKX / OnchainOS 与后端验证过的交易成功会进入战绩。',
+      status: 'ready',
+      source: 'card-library',
     })
   }
 
   if (actions.length === 0) {
     actions.push({
       id: 'keep-building',
-      title: '继续积累高质量卡片',
-      description: '更多授权、任务和分析记录会让会员等级更稳定。',
+      title: '继续积累高质量交易卡',
+      description: '更多交易中和交易成功记录会让会员等级更稳定。',
       status: 'ready',
       source: 'card-library',
     })

@@ -212,7 +212,7 @@ export default function HomeScreen() {
                 <View style={styles.emptyCopy}>
                   <AppText variant="section">你只管说，卡片会说清楚</AppText>
                   <AppText color="textMuted">
-                    页面只展示必要结果。详细过程会折叠，成功记录会进入卡库。
+                    页面只展示必要结果。详细过程会折叠，交易中和交易成功会进入卡库。
                   </AppText>
                 </View>
               </TerminalCard>
@@ -383,7 +383,7 @@ function TrustStrip() {
   const items = [
     { label: '一次授权', icon: LockKeyhole },
     { label: '密钥不进前端', icon: WalletCards },
-    { label: '结果进卡库', icon: Sparkles },
+    { label: '交易进卡库', icon: Sparkles },
   ]
 
   return (
@@ -566,7 +566,7 @@ function CommunityView() {
             {growth ? growth.tier.label : '一起做任务，一起赚币'}
           </AppText>
           <AppText color="textSecondary">
-            社区内容保持简单：看等级、接支线、追踪卡库进度。真实收益和奖励只认后端验证结果。
+            社区内容保持简单：看等级、接支线、追踪交易卡库进度。真实收益和奖励只认后端验证结果。
           </AppText>
         </View>
       </LinearGradient>
@@ -577,10 +577,13 @@ function CommunityView() {
         </AppText>
         <View style={styles.communityStats}>
           <CommunityStat label="成长分" value={growth ? String(growth.score) : '--'} />
-          <CommunityStat label="卡库" value={String(stats.totalCards)} />
+          <CommunityStat label="交易卡" value={String(stats.totalCards)} />
           <CommunityStat
-            label="待授权"
-            value={String(stats.pendingConfirmations)}
+            label="交易中"
+            value={String(
+              stats.confirmations.confirmed +
+                (stats.confirmations.pendingExecution ?? 0),
+            )}
           />
         </View>
       </TerminalCard>
@@ -597,11 +600,11 @@ function CommunityView() {
           </View>
         ) : (
           <AppText color="textSecondary">
-            生成交易卡、回执卡或分析卡后，支线进度会自动出现。
+            交易进入执行通道或成功后，支线进度会自动出现。
           </AppText>
         )}
         <Button fullWidth onPress={() => router.push('/cards')}>
-          去卡库接支线
+          去交易卡库接支线
         </Button>
       </TerminalCard>
 

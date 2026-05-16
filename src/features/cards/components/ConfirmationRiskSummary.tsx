@@ -74,7 +74,7 @@ function getRiskSummary(card: ConversationCard) {
       tone: 'gold' as RiskTone,
       iconColor: '#F4D98B',
       reasons: [
-        '授权记录已进入卡库。',
+        '授权记录已保存，等待进入执行通道。',
         '真实 Swap 仍然需要 OKX quote、swap data 和风控。',
         '当前版本不会广播交易。',
       ],
@@ -116,9 +116,11 @@ function getRiskSummary(card: ConversationCard) {
       tone: 'success' as RiskTone,
       iconColor: '#18C47C',
       reasons: [
-        '结果已进入卡库。',
-        '可用于会员评分和任务统计。',
-        '后续建议会引用这张卡的数据。',
+        card.type === 'trade-success'
+          ? '交易成功结果已进入卡库。'
+          : '结果已保存到对应模块。',
+        '交易成功卡可用于会员评分和支线任务统计。',
+        '后续建议只会引用已验证的交易数据。',
       ],
     }
   }

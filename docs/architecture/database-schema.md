@@ -42,9 +42,11 @@ secrets.
 
 ### cards
 
-The Card Library ledger. Cards are the shared data source for AI conversation,
-wallet actions, trading authorizations, receipts, portfolio advice, membership
-growth, and side quests.
+Stores conversation cards and the Card Library source rows. The Card Library
+view is intentionally narrower than the full conversation history: it only
+counts trading-in-progress cards and verified trade-success cards. Wallet
+actions, startup/preflight cards, portfolio insight cards, and side quest cards
+remain in their own product surfaces and do not enter the Card Library ledger.
 
 ### card_events
 

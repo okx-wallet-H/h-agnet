@@ -62,8 +62,8 @@ const statusCopy: Record<
     tone: 'purple',
   },
   completed: {
-    title: '结果已进入卡库',
-    body: '这张卡会用于任务评分、会员等级和后续组合建议。',
+    title: '结果已完成',
+    body: '只有交易成功卡会进入交易卡库，其他完成记录会留在对话或对应模块。',
     status: '已完成',
     tone: 'success',
   },
@@ -75,7 +75,7 @@ const statusCopy: Record<
   },
   archived: {
     title: '已放入历史',
-    body: '这张卡不会再进入授权流程，可以在卡库里查看。',
+    body: '这张卡不会再进入授权流程，可以在对话历史里查看。',
     status: '已归档',
     tone: 'muted',
   },
@@ -86,6 +86,7 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
   const [updatedCard, setUpdatedCard] = useState<ConversationCard | null>(null)
   const currentCard = getDisplayCardSnapshot(card, updatedCard)
+  const canOpenCardLibrary = isCardLibraryEligible(currentCard)
   const prepareCard = usePrepareConversationCardForConfirmation()
   const archiveCard = useArchiveConversationCard()
   const copy = getStatusCopy(currentCard)
@@ -107,14 +108,18 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
       return
     }
 
+    if (!canEnterAuthorization) {
+      router.push(canOpenCardLibrary ? '/cards' : '/home')
+      return
+    }
+
     if (
-      !canEnterAuthorization ||
       isAgentAuthorized ||
       currentCard.status === 'pending-execution' ||
       currentCard.status === 'completed' ||
       currentCard.status === 'archived'
     ) {
-      router.push('/cards')
+      router.push(canOpenCardLibrary ? '/cards' : '/agent')
       return
     }
 
@@ -192,7 +197,7 @@ export function ChatCardActions({ card }: ChatCardActionsProps) {
 function getStatusCopy(card: ConversationCard) {
   if (!isAuthorizationFlowCard(card)) {
     return {
-      title: '已记录到卡库',
+      title: '对话记录已保存',
       body: '这张卡只是记录对话和上下文，不需要授权，也不会触发钱包、交易或转账动作。',
       status: '无需授权',
       tone: 'muted' as const,
@@ -233,7 +238,7 @@ function getPrimaryLabel(
   },
 ) {
   if (!canEnterAuthorization) {
-    return '查看卡库'
+    return isCardLibraryEligible(card) ? '查看卡库' : '继续对话'
   }
 
   if (card.status === 'draft') {
@@ -245,11 +250,15 @@ function getPrimaryLabel(
   }
 
   if (card.status === 'completed' || card.status === 'archived') {
-    return '查看卡库'
+    return isCardLibraryEligible(card) ? '查看卡库' : '继续对话'
   }
 
   if (card.status === 'agent-authorized') {
-    return '查看执行状态'
+    return isCardLibraryEligible(card) ? '查看卡库' : '查看 Agent'
+  }
+
+  if (card.status === 'confirmed') {
+    return isCardLibraryEligible(card) ? '查看卡库' : '查看 Agent'
   }
 
   if (card.status === 'pending-execution') {
@@ -261,6 +270,16 @@ function getPrimaryLabel(
   }
 
   return '查看授权'
+}
+
+function isCardLibraryEligible(card: ConversationCard) {
+  return (
+    (card.type === 'trade-confirmation' &&
+      ['agent-authorized', 'confirmed', 'pending-execution'].includes(
+        card.status,
+      )) ||
+    (card.type === 'trade-success' && card.status === 'completed')
+  )
 }
 
 function createStyles(appTheme: AppTheme) {

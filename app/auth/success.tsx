@@ -11,12 +11,12 @@ import { TerminalCard } from '../../src/components/terminal/TerminalCard'
 import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme'
 import { AgentWalletFlowCard } from '../../src/features/auth/components/AgentWalletFlowCard'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
-import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
+import { useConversationCards } from '../../src/features/cards/hooks/useCardLibrary'
 
 export default function AgentWalletSuccessScreen() {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
-  const { cards } = useCardLibrary()
+  const { cards } = useConversationCards()
   const params = useLocalSearchParams<{
     email?: string
     accountId?: string

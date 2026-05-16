@@ -47,7 +47,7 @@ export function ConfirmationDecisionPanel({
     setErrorMessage(null)
 
     if (!canEnterAuthorization) {
-      router.push('/cards')
+      router.push(isCardLibraryEligible(currentCard) ? '/cards' : '/home')
       return
     }
 
@@ -78,7 +78,7 @@ export function ConfirmationDecisionPanel({
       currentCard.status === 'confirmed' ||
       currentCard.status === 'pending-execution'
     ) {
-      router.push('/cards')
+      router.push(isCardLibraryEligible(currentCard) ? '/cards' : '/agent')
     }
   }
 
@@ -175,7 +175,7 @@ function getDecisionCopy(card: ConversationCard) {
   if (!isAuthorizationFlowCard(card)) {
     return {
       title: '这张卡无需授权',
-      body: '它只是一次对话记录，不会触发钱包、交易或转账动作。后续可以在卡库里查看。',
+      body: '它只是一次对话记录，不会触发钱包、交易或转账动作，也不会进入交易卡库。',
       statusLabel: '无需授权',
       tone: 'muted' as const,
     }
@@ -231,7 +231,7 @@ function getDecisionCopy(card: ConversationCard) {
   if (card.status === 'confirmed') {
     return {
       title: '授权已记录',
-      body: '授权记录已进入卡库。当前版本仍然不会执行真实交易或转账，后续结果会以卡片回执为准。',
+      body: '授权记录已保存。只有交易进入执行通道或真实成功后，才会进入交易卡库。',
       statusLabel: '已授权',
       tone: 'purple' as const,
     }
@@ -258,7 +258,7 @@ function getDecisionCopy(card: ConversationCard) {
   if (card.status === 'completed') {
     return {
       title: '已经完成',
-      body: '结果已进入卡库，可以用于评分、任务和组合建议。',
+      body: '交易成功结果会进入卡库，可以用于评分、支线任务和组合建议。',
       statusLabel: '已完成',
       tone: 'success' as const,
     }
@@ -274,7 +274,7 @@ function getDecisionCopy(card: ConversationCard) {
 
 function getPrimaryLabel(card: ConversationCard, isPending: boolean) {
   if (!isAuthorizationFlowCard(card)) {
-    return '查看卡库'
+    return isCardLibraryEligible(card) ? '查看卡库' : '返回对话'
   }
 
   if (card.status === 'draft') {
@@ -290,14 +290,24 @@ function getPrimaryLabel(card: ConversationCard, isPending: boolean) {
   }
 
   if (card.status === 'confirmed' || card.status === 'pending-execution') {
-    return '查看卡库'
+    return isCardLibraryEligible(card) ? '查看卡库' : '查看 Agent'
   }
 
   if (card.status === 'agent-authorized') {
-    return '查看卡库'
+    return isCardLibraryEligible(card) ? '查看卡库' : '查看 Agent'
   }
 
   return '不能继续'
+}
+
+function isCardLibraryEligible(card: ConversationCard) {
+  return (
+    (card.type === 'trade-confirmation' &&
+      ['agent-authorized', 'confirmed', 'pending-execution'].includes(
+        card.status,
+      )) ||
+    (card.type === 'trade-success' && card.status === 'completed')
+  )
 }
 
 function createStyles(appTheme: AppTheme) {

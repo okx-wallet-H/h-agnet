@@ -27,7 +27,9 @@ H.wallet.auth.status   → GET /api/h/v1/auth/agent-wallet/status
 H.wallet.auth.requestCode → POST /api/h/v1/auth/agent-wallet/request-otp
 H.wallet.auth.verifyCode  → POST /api/h/v1/auth/agent-wallet/verify
 H.wallet.session.status   → GET /api/h/v1/auth/agent-wallet/session
-H.card.wallet.created     → wallet-created card in Card Library
+H.card.wallet.created     → wallet-created conversation card
+H.card.library.list       → GET /api/h/v1/cards
+H.card.conversation.list  → GET /api/h/v1/cards/conversation
 H.agent.strategies     → GET /api/h/v1/agent/strategies
 H.agent.strategyPlan   → GET /api/h/v1/agent/strategies/:id/plan
 H.agent.skills         → GET /api/h/v1/agent/skill-wrappers
@@ -260,12 +262,21 @@ Agent Wallet permissions.
 
 ## Card Library Rule
 
-The Card Library is the shared activity ledger for the product.
+The Card Library is the trade activity ledger for the product. H Wallet may
+create many conversation cards, but only trading cards enter the Card Library:
+
+* trade-confirmation cards that are already in execution scope
+  (`agent-authorized`, `confirmed`, or `pending-execution`).
+* trade-success cards after verified completion.
+
+Startup cards, preflight cards, wallet cards, side quest cards, portfolio
+insight cards, and generic system cards remain available to the conversation or
+their own modules, but they are not Card Library records.
 
 ```txt
 module result
 → conversation card
-→ card library
+→ if trade in-progress or trade success: card library
 → portfolio advice / membership score / side quests / rewards
 ```
 
@@ -276,19 +287,17 @@ Cards may include `userId` when a H Wallet identity is active. The Card Library
 service should read the current identity from the auth boundary and attach it
 server-side. Screens must not decide card ownership.
 
-Card Library stats are separated into four groups:
+Card Library stats keep the legacy response shape for app compatibility, but
+the counters are derived only from the eligible trading subset:
 
-* `confirmations`: legacy stats key for draft, pending, authorized, and blocked
-  authorization cards.
-* `receipts`: execution receipts, including non-broadcast pending execution
-  receipts.
-* `activity`: wallet actions, trade cards, boost tasks, portfolio insights, and
-  system cards.
-* `completion`: completed cards, confirmed cards, drafts, blocked cards, and
-  verified results.
+* `confirmations`: trade cards that are already authorized or waiting for
+  execution.
+* `receipts`: compatibility object; receipt cards are not Card Library records.
+* `activity`: trade card counts; non-trade activity counters stay at zero.
+* `completion`: verified trade-success cards and in-progress trade counts.
 
-Membership scoring may use authorized cards and non-broadcast receipts as growth
-signals, but only verified result cards can represent real completed execution.
+Membership scoring may use trading-in-progress cards as activity signals, but
+only verified trade-success cards can represent real completed execution.
 
 Growth scoring v1 is exposed by `/boost/growth-summary`. It returns a
 transparent score, tier, task score, trust score, per-rule breakdown, recommended

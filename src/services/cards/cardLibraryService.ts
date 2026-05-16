@@ -8,6 +8,10 @@ export async function getCardLibrary(): Promise<ConversationCard[]> {
   return cardLibraryApi.listCards()
 }
 
+export async function getConversationCards(): Promise<ConversationCard[]> {
+  return cardLibraryApi.listConversationCards()
+}
+
 export async function getCardLibraryStats(): Promise<CardLibraryStats> {
   return cardLibraryApi.getStats()
 }

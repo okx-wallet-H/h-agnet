@@ -1,12 +1,5 @@
 import { router } from 'expo-router'
-import {
-  Archive,
-  CheckCircle2,
-  Clock3,
-  LibraryBig,
-  Sparkles,
-  WalletCards,
-} from 'lucide-react-native'
+import { CheckCircle2, Clock3, LibraryBig, Sparkles } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
@@ -16,7 +9,6 @@ import { StatusPill } from '../../src/components/primitives/StatusPill'
 import { ScreenHeader } from '../../src/components/terminal/ScreenHeader'
 import { TerminalCard } from '../../src/components/terminal/TerminalCard'
 import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme'
-import { earningAgentExampleCommand } from '../../src/features/agent/model/earningAgentExperience'
 import { CardLibrarySummary } from '../../src/features/cards/components/CardLibrarySummary'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
 import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
@@ -25,49 +17,38 @@ import type {
   ConversationCard,
 } from '../../src/services/cards/types'
 
-type CardFilter = 'all' | 'confirm' | 'completed' | 'wallet' | 'insight'
-type CardFilterV2 =
-  | CardFilter
-  | 'agent'
-  | 'receipt'
-  | 'task'
-  | 'verified'
+type CardFilter = 'all' | 'in-progress' | 'success'
 
 const previewCard: ConversationCard = {
   id: 'card-library-preview',
-  type: 'system-status',
-  status: 'draft',
+  type: 'trade-confirmation',
+  status: 'pending-execution',
   source: 'ai-agent',
-  title: '卡库已就绪',
+  title: '交易卡库待激活',
   summary:
-    '以后每一次授权、成功、奖励和分析都会沉淀到这里，成为会员等级和任务评分的依据。',
+    '这里只收录交易中的卡片和交易成功卡。启动卡、预检卡、钱包卡和任务卡会留在 AI 对话或对应模块。',
   createdAt: new Date(0).toISOString(),
   metrics: [
-    { label: '数据来源', value: 'AI 卡片', tone: 'gold' },
+    { label: '收录范围', value: '交易卡片', tone: 'gold' },
     { label: '成功记录', value: '需验证', tone: 'danger' },
-    { label: '评分', value: '待激活', tone: 'muted' },
+    { label: '非交易卡', value: '不入库', tone: 'muted' },
   ],
-  tags: ['system', 'card-library'],
+  tags: ['trade', 'card-library-preview'],
 }
 
 const filters: Array<{
-  key: CardFilterV2
+  key: CardFilter
   label: string
 }> = [
   { key: 'all', label: '全部' },
-  { key: 'agent', label: 'Agent' },
-  { key: 'confirm', label: '待授权' },
-  { key: 'receipt', label: '回执' },
-  { key: 'wallet', label: '钱包' },
-  { key: 'task', label: '任务' },
-  { key: 'insight', label: '分析' },
-  { key: 'verified', label: '已验证' },
+  { key: 'in-progress', label: '交易中' },
+  { key: 'success', label: '交易成功' },
 ]
 
 export default function CardLibraryScreen() {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
-  const [filter, setFilter] = useState<CardFilterV2>('all')
+  const [filter, setFilter] = useState<CardFilter>('all')
   const {
     cards,
     isBackendConfigured,
@@ -79,6 +60,8 @@ export default function CardLibraryScreen() {
     () => getFilteredCards(cards, filter),
     [cards, filter],
   )
+  const inProgressCount =
+    stats.confirmations.confirmed + (stats.confirmations.pendingExecution ?? 0)
   const visibleCards = cards.length > 0 ? filteredCards : [previewCard]
   const showFilteredEmpty = cards.length > 0 && filteredCards.length === 0
 
@@ -86,9 +69,9 @@ export default function CardLibraryScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <ScreenHeader
         eyebrow="卡库"
-        title="用户成长数据"
-        description="H Wallet 会把授权卡、结果卡、任务卡和分析卡收进这里，用来计算会员等级、支线任务和组合建议。"
-        statusLabel="卡库 v1"
+        title="交易卡库"
+        description="H Wallet 只把交易中的卡片和交易成功卡收进这里。启动、预检、钱包、任务和分析卡留在对话或对应模块。"
+        statusLabel="交易卡库 v1"
         statusTone="gold"
       />
 
@@ -96,18 +79,18 @@ export default function CardLibraryScreen() {
 
       <View style={styles.quickRow}>
         <InsightTile
-          icon="confirm"
-          label="待授权"
-          value={String(stats.confirmations.pending)}
+          icon="in-progress"
+          label="交易中"
+          value={String(inProgressCount)}
         />
         <InsightTile
-          icon="receipt"
-          label="执行回执"
-          value={String(stats.receipts.total)}
+          icon="in-progress"
+          label="待执行"
+          value={String(stats.confirmations.pendingExecution ?? 0)}
         />
         <InsightTile
           icon="done"
-          label="已验证"
+          label="交易成功"
           value={String(stats.completion.verifiedResults)}
         />
       </View>
@@ -118,7 +101,9 @@ export default function CardLibraryScreen() {
             <AppText variant="caption" color="goldBright">
               建议
             </AppText>
-            <AppText variant="section">{getGuidanceTitle(stats.totalCards)}</AppText>
+            <AppText variant="section">
+              {getGuidanceTitle(stats.totalCards)}
+            </AppText>
           </View>
           <Sparkles color={appTheme.colors.goldBright} size={22} />
         </View>
@@ -185,7 +170,7 @@ export default function CardLibraryScreen() {
         <TerminalCard style={styles.card}>
           <AppText variant="section">这个分类暂时没有卡片</AppText>
           <AppText color="textMuted">
-            继续和 H Wallet 对话，新的卡片会自动进入对应分类。
+            只有交易中或交易成功的卡片会出现在这里。
           </AppText>
         </TerminalCard>
       ) : null}
@@ -200,25 +185,24 @@ export default function CardLibraryScreen() {
             <AppText variant="caption" color="goldBright">
               数据规则
             </AppText>
-            <AppText variant="section">卡库只认真实记录</AppText>
+            <AppText variant="section">卡库只认交易记录</AppText>
           </View>
           <LibraryBig color={appTheme.colors.violet} size={22} />
         </View>
         <AppText color="textSecondary">
-          AI 可以生成草案卡，但交易成功、奖励领取和资产建议必须等待后端验证。
+          AI 可以生成启动、预检和授权草案，但这些不会进入卡库。交易成功必须等待
+          OKX / OnchainOS 与后端回执验证。
         </AppText>
         <View style={styles.ruleRow}>
-          <StatusPill label="不造假收益" tone="gold" />
-          <StatusPill label="不伪造余额" tone="purple" />
-          <StatusPill label="授权前不执行" tone="success" />
+          <StatusPill label="只收交易卡" tone="gold" />
+          <StatusPill label="成功需验证" tone="purple" />
+          <StatusPill label="过程可追踪" tone="success" />
         </View>
       </TerminalCard>
 
       <Button fullWidth onPress={() => router.back()}>
         返回
       </Button>
-
-      <Archive color={appTheme.colors.borderMuted} size={1} />
     </ScrollView>
   )
 }
@@ -228,18 +212,13 @@ function InsightTile({
   label,
   value,
 }: {
-  icon: 'confirm' | 'done' | 'receipt' | 'wallet'
+  icon: 'in-progress' | 'done'
   label: string
   value: string
 }) {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
-  const Icon =
-    icon === 'confirm'
-      ? Clock3
-      : icon === 'wallet'
-        ? WalletCards
-        : CheckCircle2
+  const Icon = icon === 'in-progress' ? Clock3 : CheckCircle2
 
   return (
     <TerminalCard style={styles.insightTile}>
@@ -252,97 +231,55 @@ function InsightTile({
   )
 }
 
-function getFilteredCards(cards: ConversationCard[], filter: CardFilterV2) {
-  if (filter === 'confirm') {
-    return cards.filter((card) => card.status === 'requires-confirmation')
+function getFilteredCards(cards: ConversationCard[], filter: CardFilter) {
+  if (filter === 'in-progress') {
+    return cards.filter((card) => isTradingInProgressCard(card))
   }
 
-  if (filter === 'completed') {
-    return cards.filter((card) => card.status === 'completed')
-  }
-
-  if (filter === 'agent') {
-    return cards.filter((card) =>
-      card.tags.some((tag) =>
-        ['agent', 'earning-agent', 'official-strategy', 'runner-status'].includes(
-          tag,
-        ),
-      ),
-    )
-  }
-
-  if (filter === 'receipt') {
-    return cards.filter((card) => card.type === 'execution-receipt')
-  }
-
-  if (filter === 'wallet') {
-    return cards.filter(
-      (card) =>
-        ['wallet-confirmation', 'recharge-success', 'withdrawal-success'].includes(
-          card.type,
-        ) ||
-        (card.type === 'execution-receipt' && card.source === 'wallet-service'),
-    )
-  }
-
-  if (filter === 'task') {
-    return cards.filter((card) => card.type === 'side-quest')
-  }
-
-  if (filter === 'insight') {
-    return cards.filter((card) =>
-      ['portfolio-insight', 'membership-score', 'side-quest'].includes(
-        card.type,
-      ),
-    )
-  }
-
-  if (filter === 'verified') {
+  if (filter === 'success') {
     return cards.filter((card) => isVerifiedResultCard(card))
   }
 
   return cards
 }
 
-function isVerifiedResultCard(card: ConversationCard) {
+function isTradingInProgressCard(card: ConversationCard) {
   return (
-    card.status === 'completed' &&
-    ['trade-success', 'recharge-success', 'withdrawal-success'].includes(
-      card.type,
-    )
+    card.type === 'trade-confirmation' &&
+    ['agent-authorized', 'confirmed', 'pending-execution'].includes(card.status)
   )
+}
+
+function isVerifiedResultCard(card: ConversationCard) {
+  return card.type === 'trade-success' && card.status === 'completed'
 }
 
 function getGuidanceTitle(totalCards: number) {
   if (totalCards === 0) {
-    return '先生成第一张卡'
+    return '等待第一张交易卡'
   }
 
   if (totalCards < 5) {
-    return '继续积累卡片记录'
+    return '继续积累交易记录'
   }
 
-  return '可以开始做组合建议'
+  return '可以进入交易复盘'
 }
 
 function getGuidanceCopy(stats: CardLibraryStats) {
-  if (stats.pendingConfirmations > 0) {
-    return '你有卡片等待授权。授权前不会执行交易或转账，可以放心先查看内容。'
-  }
-
   if (stats.totalCards === 0) {
-    return `回到 AI 对话，输入“${earningAgentExampleCommand}”或“帮我分析资产”，卡库会开始积累数据。`
+    return '回到 AI 对话启动 Agent 或发起交易。只有交易进入执行通道或真实成功后，才会沉淀到卡库。'
   }
 
-  if (stats.receipts.total > 0 && stats.completion.verifiedResults === 0) {
-    return '你已经有授权回执。它们会用于成长评分，但不会被当作真实链上成功。'
+  if ((stats.confirmations.pendingExecution ?? 0) > 0) {
+    return '当前有交易正在等待执行回执。没有链上成功证明前，它只会被统计为交易中。'
   }
 
-  if (stats.totalCards < 5) {
-    return '继续积累授权卡、回执卡、任务卡和分析卡，会员等级会更准确。'
+  if (stats.completion.verifiedResults === 0) {
+    return '已有交易过程卡，但还没有已验证的成功交易。卡库不会把过程卡当作收益证明。'
   }
 
-  return '卡库已有基础记录，后续可以基于这些数据生成更个性化的投资组合建议。'
+  return '卡库已有成功交易记录，后续可以基于这些记录做复盘、支线任务和组合建议。'
 }
 
 function createStyles(appTheme: AppTheme) {

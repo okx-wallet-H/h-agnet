@@ -65,7 +65,7 @@ export default function BoostScreen() {
       <ScreenHeader
         eyebrow="支线任务"
         title="卡库成就"
-        description="支线任务从卡库接取。交易卡、回执卡、分析卡和支线卡达到条件后，自动解锁对应成就。"
+        description="支线任务从交易卡库接取。交易进入执行通道或交易成功达到条件后，自动解锁对应成就。"
         statusLabel="卡库驱动"
         statusTone="gold"
       />
@@ -148,7 +148,7 @@ export default function BoostScreen() {
           </View>
         ) : (
           <AppText color="textSecondary">
-            生成授权卡、任务卡或分析卡后，这里会显示具体加分来源。
+            生成交易中或交易成功卡后，这里会显示具体加分来源。
           </AppText>
         )}
       </TerminalCard>
@@ -159,7 +159,7 @@ export default function BoostScreen() {
             <AppText variant="caption" color="goldBright">
               支线任务
             </AppText>
-            <AppText variant="section">到卡库接任务</AppText>
+            <AppText variant="section">到交易卡库接任务</AppText>
           </View>
           <Award color={appTheme.colors.violet} size={22} />
         </View>
@@ -171,7 +171,7 @@ export default function BoostScreen() {
           </View>
         ) : (
           <AppText color="textSecondary">
-            正在读取卡库支线。生成交易卡、回执卡或分析卡后，进度会自动更新。
+            正在读取卡库支线。交易进入执行通道或成功后，进度会自动更新。
           </AppText>
         )}
       </TerminalCard>
@@ -214,7 +214,7 @@ export default function BoostScreen() {
         fullWidth
         onPress={() => router.push('/cards')}
       >
-        打开卡库接支线
+        打开交易卡库接支线
       </Button>
     </ScrollView>
   )

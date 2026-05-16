@@ -19,6 +19,7 @@ const {
   confirmCardReview,
   createCard,
   getCardLibraryStats,
+  listConversationCards,
   listCards,
   prepareCardForConfirmation,
 } = require('./services/cardsService')
@@ -309,6 +310,11 @@ async function handleRequest(request, response) {
 
     if (request.method === 'GET' && routePath === '/cards') {
       sendJson(response, 200, { ok: true, data: listCards() })
+      return
+    }
+
+    if (request.method === 'GET' && routePath === '/cards/conversation') {
+      sendJson(response, 200, { ok: true, data: listConversationCards() })
       return
     }
 

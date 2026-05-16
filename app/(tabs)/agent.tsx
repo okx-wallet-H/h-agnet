@@ -29,7 +29,7 @@ import {
 } from '../../src/features/agent/model/earningAgentExperience'
 import { CardReviewActions } from '../../src/features/cards/components/CardReviewActions'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
-import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
+import { useConversationCards } from '../../src/features/cards/hooks/useCardLibrary'
 import { getConfirmationQueueStats } from '../../src/features/cards/model/confirmationQueue'
 import { isApiConfigured } from '../../src/services/api/httpClient'
 import type {
@@ -47,7 +47,7 @@ export default function AgentScreen() {
   const officialStrategies = useOfficialStrategySkills()
   const startStrategy = useStartOfficialStrategy()
   const invokeSkill = useInvokeHSkill()
-  const { cards } = useCardLibrary()
+  const { cards } = useConversationCards()
   const queueStats = getConfirmationQueueStats(cards)
   const visibleMessages = useMemo(
     () => (messages.data ?? []).slice(-4),
@@ -61,7 +61,7 @@ export default function AgentScreen() {
       <ScreenHeader
         eyebrow="AI Agent Wallet"
         title="赚币 Agent"
-        description="用一句话启动 Agent。H Wallet 会先生成卡片，授权前不会动用资产；执行状态、暂停原因和回执都会进入卡库。"
+        description="用一句话启动 Agent。H Wallet 会先生成启动卡，授权前不会动用资产；只有交易进入执行通道或成功后才进入卡库。"
         statusLabel={backendConfigured ? '对话就绪' : '后端未配置'}
         statusTone={backendConfigured ? 'gold' : 'muted'}
       />
@@ -529,7 +529,7 @@ function getAgentStatusCopy({
   }
 
   if (runnerStatus.state === 'completed') {
-    return 'Agent 本轮结果已经完成，并写入卡库。'
+    return 'Agent 本轮结果已经完成，已验证的交易结果会写入卡库。'
   }
 
   return runnerStatus.summary

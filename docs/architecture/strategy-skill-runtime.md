@@ -130,8 +130,10 @@ This endpoint calls only currently available read-only or preflight H Skill
 wrappers. It may read wallet context, market trends, onchain signals, token
 profile, token-scan, or swap quote when enough input is provided. It skips
 asset-changing wrappers such as swap execution, DeFi deposit, reward claim, and
-broadcast. The response writes a runner-status card to the Card Library so the
-chat can show a simple Chinese card instead of exposing provider complexity.
+broadcast. The response writes a runner-status conversation card so the chat can
+show a simple Chinese card instead of exposing provider complexity; runner
+status cards do not enter the Card Library unless a later trade card reaches
+the trading-in-progress or verified-success criteria.
 
 The first strategy-composition wrappers are:
 

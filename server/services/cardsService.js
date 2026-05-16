@@ -55,18 +55,10 @@ const confirmationCardTypes = new Set([
   'trade-confirmation',
 ])
 
-const walletActionCardTypes = new Set([
-  'wallet-created',
-  'wallet-confirmation',
-  'recharge-success',
-  'withdrawal-success',
-])
-
-const successCardTypes = new Set([
-  'wallet-created',
-  'trade-success',
-  'recharge-success',
-  'withdrawal-success',
+const cardLibraryTradeInProgressStatuses = new Set([
+  'agent-authorized',
+  'confirmed',
+  'pending-execution',
 ])
 
 function nowIso() {
@@ -186,7 +178,6 @@ function createAgentWalletCreatedCard(session) {
       'wallet',
       'agent-wallet',
       'wallet-created',
-      'card-library',
       'verified-session',
       walletBindingTag,
       session.accountId ? `account:${session.accountId}` : null,
@@ -269,7 +260,6 @@ function createExecutionReceiptCard(card, context = {}) {
       'receipt',
       'execution',
       'not-broadcast',
-      'card-library',
       `parent:${card.id}`,
     ],
   })
@@ -341,7 +331,6 @@ function createStrategyRunnerReceiptCard(card, runnerStatus) {
       'receipt',
       'execution',
       'not-broadcast',
-      'card-library',
       'agent',
       'earning-agent',
       'runner-status',
@@ -555,22 +544,44 @@ function createCard(input) {
 }
 
 function listCards() {
+  return cardRepository
+    .list({ userId: getCurrentUserId() })
+    .filter(isCardLibraryCard)
+}
+
+function listConversationCards() {
   return [...cardRepository.list({ userId: getCurrentUserId() })]
 }
 
 function isVerifiedResultCard(card) {
-  return card.status === 'completed' && successCardTypes.has(card.type)
+  return card.type === 'trade-success' && card.status === 'completed'
+}
+
+function isTradingInProgressCard(card) {
+  return (
+    card.type === 'trade-confirmation' &&
+    cardLibraryTradeInProgressStatuses.has(card.status)
+  )
+}
+
+function isCardLibraryCard(card) {
+  return (
+    card.status !== 'archived' &&
+    (isTradingInProgressCard(card) || isVerifiedResultCard(card))
+  )
 }
 
 function getCardLibraryStats() {
-  const cards = cardRepository.list({ userId: getCurrentUserId() })
-  const activeCards = cards.filter((card) => card.status !== 'archived')
-  const archivedCards = cards.filter((card) => card.status === 'archived')
-  const latestCard = cards[0]
-  const confirmationCards = activeCards.filter(isConfirmationCard)
-  const draftCards = activeCards.filter((card) => card.status === 'draft')
-  const pendingCards = confirmationCards.filter(
-    (card) => card.status === 'requires-confirmation',
+  const allCards = cardRepository.list({ userId: getCurrentUserId() })
+  const libraryCards = allCards.filter(isCardLibraryCard)
+  const archivedCards = allCards.filter(
+    (card) =>
+      card.status === 'archived' &&
+      ['trade-confirmation', 'trade-success'].includes(card.type),
+  )
+  const latestCard = libraryCards[0]
+  const confirmationCards = libraryCards.filter(
+    (card) => card.type === 'trade-confirmation',
   )
   const confirmedCards = confirmationCards.filter(
     (card) => card.status === 'confirmed',
@@ -578,88 +589,55 @@ function getCardLibraryStats() {
   const pendingExecutionCards = confirmationCards.filter(
     (card) => card.status === 'pending-execution',
   )
-  const blockedCards = confirmationCards.filter((card) => card.status === 'blocked')
-  const completedCards = activeCards.filter((card) => card.status === 'completed')
-  const walletActionCards = activeCards.filter((card) =>
-    walletActionCardTypes.has(card.type),
+  const agentAuthorizedCards = confirmationCards.filter(
+    (card) => card.status === 'agent-authorized',
   )
-  const executionReceipts = activeCards.filter(
-    (card) => card.type === 'execution-receipt',
-  )
-  const nonBroadcastReceipts = executionReceipts.filter((card) =>
-    card.tags.includes('not-broadcast'),
-  )
-  const verifiedResults = activeCards.filter(isVerifiedResultCard)
-  const portfolioInsights = activeCards.filter(
-    (card) => card.type === 'portfolio-insight',
-  )
-  const membershipCards = activeCards.filter(
-    (card) => card.type === 'membership-score',
-  )
-  const sideQuestCards = activeCards.filter((card) => card.type === 'side-quest')
-  const tradeCards = activeCards.filter((card) =>
-    ['trade-confirmation', 'trade-success'].includes(card.type),
-  )
-  const systemCards = activeCards.filter((card) => card.type === 'system-status')
+  const verifiedResults = libraryCards.filter(isVerifiedResultCard)
   const stats = {
-    totalCards: activeCards.length,
-    activeCards: activeCards.length,
-    completedTrades: activeCards.filter(
-      (card) => card.type === 'trade-success' && card.status === 'completed',
-    ).length,
-    completedRewards: activeCards.filter(
-      (card) => card.type === 'side-quest' && card.status === 'completed',
-    ).length,
-    pendingConfirmations: pendingCards.length,
-    walletActions: walletActionCards.length,
-    portfolioInsights: portfolioInsights.length,
+    totalCards: libraryCards.length,
+    activeCards: libraryCards.length,
+    completedTrades: verifiedResults.length,
+    completedRewards: 0,
+    pendingConfirmations: 0,
+    walletActions: 0,
+    portfolioInsights: 0,
     archivedCards: archivedCards.length,
     membershipScore: null,
     latestCardAt: latestCard?.createdAt,
     confirmations: {
       total: confirmationCards.length,
-      draft: confirmationCards.filter((card) => card.status === 'draft').length,
-      pending: confirmationCards.filter(
-        (card) => card.status === 'requires-confirmation',
-      ).length,
-      confirmed: confirmationCards.filter(
-        (card) => card.status === 'confirmed',
-      ).length,
-      pendingExecution: confirmationCards.filter(
-        (card) => card.status === 'pending-execution',
-      ).length,
-      blocked: confirmationCards.filter(
-        (card) => card.status === 'blocked',
-      ).length,
+      draft: 0,
+      pending: 0,
+      confirmed: confirmedCards.length + agentAuthorizedCards.length,
+      pendingExecution: pendingExecutionCards.length,
+      blocked: 0,
     },
     receipts: {
-      total: executionReceipts.length,
-      nonBroadcast: nonBroadcastReceipts.length,
-      pendingExecution: nonBroadcastReceipts.length,
-      verified: executionReceipts.filter(
-        (card) => card.status === 'completed',
-      ).length,
+      total: 0,
+      nonBroadcast: 0,
+      pendingExecution: pendingExecutionCards.length,
+      verified: verifiedResults.length,
     },
     activity: {
-      walletActions: walletActionCards.length,
-      tradeCards: tradeCards.length,
-      boostTasks: sideQuestCards.length,
-      portfolioInsights: portfolioInsights.length,
-      membershipCards: membershipCards.length,
-      systemCards: systemCards.length,
+      walletActions: 0,
+      tradeCards: libraryCards.length,
+      boostTasks: 0,
+      portfolioInsights: 0,
+      membershipCards: 0,
+      systemCards: 0,
     },
     completion: {
-      completedCards: completedCards.length,
-      confirmedCards: confirmedCards.length,
+      completedCards: verifiedResults.length,
+      confirmedCards: confirmedCards.length + agentAuthorizedCards.length,
       pendingExecutionCards: pendingExecutionCards.length,
-      draftCards: draftCards.length,
-      blockedCards: blockedCards.length,
+      draftCards: 0,
+      blockedCards: 0,
       verifiedResults: verifiedResults.length,
     },
   }
 
   stats.membershipScore =
-    activeCards.length > 0 ? evaluateCardLibraryScore(stats).score : null
+    libraryCards.length > 0 ? evaluateCardLibraryScore(stats).score : null
 
   return stats
 }
@@ -879,6 +857,7 @@ module.exports = {
   createAgentWalletCreatedCard,
   createCard,
   getCardLibraryStats,
+  listConversationCards,
   listCards,
   prepareCardForConfirmation,
 }

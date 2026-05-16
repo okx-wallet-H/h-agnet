@@ -12,7 +12,7 @@ import { theme, useAppTheme, type AppTheme } from '../../src/design-system/theme
 import { ConfirmationDecisionPanel } from '../../src/features/cards/components/ConfirmationDecisionPanel'
 import { ConfirmationRiskSummary } from '../../src/features/cards/components/ConfirmationRiskSummary'
 import { ConversationDataCard } from '../../src/features/cards/components/ConversationDataCard'
-import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
+import { useConversationCards } from '../../src/features/cards/hooks/useCardLibrary'
 import {
   getConfirmationQueueCards,
   getConfirmationQueueStats,
@@ -21,7 +21,8 @@ import {
 export default function ConfirmCenterScreen() {
   const appTheme = useAppTheme()
   const styles = useMemo(() => createStyles(appTheme), [appTheme])
-  const { cards, isBackendConfigured, isError, isLoading } = useCardLibrary()
+  const { cards, isBackendConfigured, isError, isLoading } =
+    useConversationCards()
   const queueCards = useMemo(
     () => getConfirmationQueueCards(cards),
     [cards],
@@ -82,7 +83,7 @@ export default function ConfirmCenterScreen() {
             读取失败
           </AppText>
           <AppText color="textSecondary">
-            暂时无法读取卡库，请检查后端服务状态。
+            暂时无法读取授权卡片，请检查后端服务状态。
           </AppText>
         </TerminalCard>
       ) : null}

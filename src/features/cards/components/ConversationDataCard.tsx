@@ -228,7 +228,9 @@ function getGateDescription(card: ConversationCard) {
   }
 
   if (status === 'completed') {
-    return '结果已收录进卡库，会用于任务、等级和组合建议。'
+    return card.type === 'trade-success'
+      ? '交易成功结果已收录进卡库，会用于任务、等级和组合建议。'
+      : '结果已保存到对应模块，不会作为交易卡库数据。'
   }
 
   if (status === 'blocked') {
@@ -1042,7 +1044,7 @@ function getTradeStateCopy(stage: string, status: ConversationCardStatus) {
     return '结果已验证并进入卡库，后续会用于任务、会员等级和组合建议。'
   }
 
-  return 'Agent 会在授权范围内继续推进，所有关键结果都会写入卡库。'
+  return 'Agent 会在授权范围内继续推进，交易进行中和成功结果会写入卡库。'
 }
 
 function getTradeStateTone(status: ConversationCardStatus) {

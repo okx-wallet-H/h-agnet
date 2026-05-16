@@ -12,6 +12,7 @@ export type CreateConversationCardInput = Omit<
 
 export type CardLibraryApi = {
   listCards: () => Promise<ConversationCard[]>
+  listConversationCards: () => Promise<ConversationCard[]>
   getStats: () => Promise<CardLibraryStats>
   createCard: (
     input: CreateConversationCardInput,
@@ -24,6 +25,9 @@ export type CardLibraryApi = {
 export const cardLibraryApi: CardLibraryApi = {
   listCards() {
     return apiRequest('/cards')
+  },
+  listConversationCards() {
+    return apiRequest('/cards/conversation')
   },
   getStats() {
     return apiRequest('/cards/stats')

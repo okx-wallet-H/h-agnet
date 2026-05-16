@@ -10,6 +10,7 @@ import {
   archiveConversationCard,
   confirmConversationCard,
   createConversationCard,
+  getConversationCards,
   getCardLibrary,
   getCardLibraryStats,
   prepareConversationCardForConfirmation,
@@ -19,6 +20,8 @@ import type { CardLibraryStats } from '../../../services/cards/types'
 export const cardLibraryKeys = {
   all: ['card-library'] as const,
   cards: () => [...cardLibraryKeys.all, 'cards'] as const,
+  conversationCards: () =>
+    [...cardLibraryKeys.all, 'conversation-cards'] as const,
   stats: () => [...cardLibraryKeys.all, 'stats'] as const,
 }
 
@@ -89,6 +92,23 @@ export function useCardLibrary() {
     isError: cardsQuery.isError || statsQuery.isError,
     isLoading: cardsQuery.isLoading || statsQuery.isLoading,
     stats: statsQuery.data ?? emptyStats,
+  }
+}
+
+export function useConversationCards() {
+  const enabled = isApiConfigured()
+  const cardsQuery = useQuery({
+    queryKey: cardLibraryKeys.conversationCards(),
+    queryFn: getConversationCards,
+    enabled,
+  })
+
+  return {
+    cards: cardsQuery.data ?? [],
+    error: cardsQuery.error,
+    isBackendConfigured: enabled,
+    isError: cardsQuery.isError,
+    isLoading: cardsQuery.isLoading,
   }
 }
 
