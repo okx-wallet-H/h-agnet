@@ -30,6 +30,9 @@ const {
   verifyTradeResult,
 } = require('./services/tradeResultVerificationService')
 const {
+  recordTradeExecutionHandoff,
+} = require('./services/tradeExecutionHandoffService')
+const {
   getWalletAccount,
   getWalletAddresses,
   getWalletAssets,
@@ -393,6 +396,20 @@ async function handleRequest(request, response) {
       sendJson(response, 200, {
         ok: true,
         data: await verifyTradeResult(cardId, body),
+      })
+      return
+    }
+
+    if (
+      request.method === 'POST' &&
+      routePath.match(/^\/cards\/[^/]+\/execution-handoff$/)
+    ) {
+      const cardId = routePath.split('/')[2]
+      const body = await readJsonBody(request)
+
+      sendJson(response, 200, {
+        ok: true,
+        data: recordTradeExecutionHandoff(cardId, body),
       })
       return
     }

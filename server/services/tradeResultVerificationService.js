@@ -80,10 +80,21 @@ function createTrackingInput(card, input) {
   const pipelineIntent = isRecord(card.metadata?.pipeline?.intent)
     ? card.metadata.pipeline.intent
     : {}
-  const chain = readString(input.chain) ?? readString(pipelineIntent.chain)
+  const execution = isRecord(card.metadata?.execution)
+    ? card.metadata.execution
+    : {}
+  const chain =
+    readString(input.chain) ??
+    readString(execution.chain) ??
+    readString(pipelineIntent.chain)
   const chainIndex =
-    readString(input.chainIndex) ?? readString(pipelineIntent.chainIndex)
-  const txHash = readString(input.txHash) ?? readString(card.metadata?.txHash)
+    readString(input.chainIndex) ??
+    readString(execution.chainIndex) ??
+    readString(pipelineIntent.chainIndex)
+  const txHash =
+    readString(input.txHash) ??
+    readString(execution.txHash) ??
+    readString(card.metadata?.txHash)
 
   if (!chain && !chainIndex) {
     throwHttpError(400, 'chain-required', '验证交易结果需要 chain 或 chainIndex。')
@@ -97,7 +108,11 @@ function createTrackingInput(card, input) {
     chain,
     chainIndex,
     isFromMyProject:
-      typeof input.isFromMyProject === 'boolean' ? input.isFromMyProject : true,
+      typeof input.isFromMyProject === 'boolean'
+        ? input.isFromMyProject
+        : typeof execution.isFromMyProject === 'boolean'
+          ? execution.isFromMyProject
+          : true,
     txHash,
   }
 }

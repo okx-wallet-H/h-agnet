@@ -30,6 +30,7 @@ H.wallet.session.status   → GET /api/h/v1/auth/agent-wallet/session
 H.card.wallet.created     → wallet-created conversation card
 H.card.library.list       → GET /api/h/v1/cards
 H.card.conversation.list  → GET /api/h/v1/cards/conversation
+H.card.trade.handoff      → POST /api/h/v1/cards/:id/execution-handoff
 H.card.trade.verify       → POST /api/h/v1/cards/:id/verify-trade
 H.agent.strategies     → GET /api/h/v1/agent/strategies
 H.agent.strategyPlan   → GET /api/h/v1/agent/strategies/:id/plan
@@ -307,10 +308,15 @@ simulation gate. If OKX data, wallet context, authorization, or simulation is
 missing, the continuation writes a blocked conversation card instead of a Card
 Library card.
 
-When a pending trade later has a transaction hash, `POST /cards/:id/verify-trade`
-checks OKX DEX History through `H.skill.gateway.trackOrder`. H Wallet only
-creates a `trade-success` card when OKX reports `success`. `pending`, `fail`,
-missing records, provider errors, or unknown states do not create success cards.
+When a pending trade receives a real execution callback from the Agent Wallet
+runner, `POST /cards/:id/execution-handoff` records the returned `txHash` on the
+pending card. This is a handoff receipt only; it does not create a success card
+and it cannot overwrite a different existing transaction hash.
+
+After the handoff, `POST /cards/:id/verify-trade` checks OKX DEX History
+through `H.skill.gateway.trackOrder`. H Wallet only creates a `trade-success`
+card when OKX reports `success`. `pending`, `fail`, missing records, provider
+errors, or unknown states do not create success cards.
 
 Run the local in-memory smoke check after changing Card Library, confirmation
 continuation, or trade-result verification logic:
