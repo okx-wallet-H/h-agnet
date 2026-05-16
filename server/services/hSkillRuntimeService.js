@@ -80,6 +80,22 @@ async function invokeHSkill(input) {
     return invokeRiskScanTransaction(wrapper, input?.input)
   }
 
+  if (wrapper.id === 'H.skill.strategy.composePlan') {
+    return invokeStrategyComposePlan(wrapper, input?.input)
+  }
+
+  if (wrapper.id === 'H.skill.signal.readOnchainSignals') {
+    return invokeSignalReadOnchainSignals(wrapper, input?.input)
+  }
+
+  if (wrapper.id === 'H.skill.token.analyzeRisk') {
+    return invokeTokenAnalyzeRisk(wrapper, input?.input)
+  }
+
+  if (wrapper.id === 'H.skill.market.readDexTrends') {
+    return invokeMarketReadDexTrends(wrapper, input?.input)
+  }
+
   if (wrapper.id === 'H.skill.gateway.simulate') {
     return invokeGatewaySimulate(wrapper, input?.input)
   }
@@ -197,6 +213,158 @@ async function invokeRiskScanTransaction(wrapper, input) {
       action: 'block',
       failSafe: true,
       requiredProviderSkill: 'okx-security',
+    },
+  })
+}
+
+async function invokeStrategyComposePlan(wrapper, input) {
+  const strategyId = normalizeString(input?.strategyId)
+  const strategy = strategyId
+    ? strategySkillRepository.findStrategyById(strategyId)
+    : null
+  const wrappers = strategy
+    ? strategy.requiredSkillWrappers
+    : strategySkillRepository.listHSkillWrappers().map((item) => item.id)
+  const composition = wrappers.map((wrapperId, index) => {
+    const strategyWrapper =
+      strategySkillRepository.findHSkillWrapperById(wrapperId)
+    const binding = strategyWrapper
+      ? getHSkillBindingStatus(strategyWrapper)
+      : null
+
+    return {
+      order: index + 1,
+      hSkillWrapperId: wrapperId,
+      hSkillWrapperLabel: strategyWrapper?.label ?? '未注册 H Skill Wrapper',
+      okxSkill: strategyWrapper?.providerSkill ?? 'unknown',
+      bindingStatus: binding?.status ?? 'blocked',
+      providerStatus: binding?.adapterStatus ?? 'unknown',
+    }
+  })
+
+  return recordCompletedInvocation({
+    wrapper,
+    input,
+    code: 'h-strategy-okx-composition-ready',
+    executionMode: 'strategy-composition',
+    message:
+      '已生成 H Wallet 策略的 OKX skill 组合计划；这是编排计划，不执行资产动作。',
+    resultData: {
+      compositionGate: 'completed',
+      action: 'observe',
+      source: 'h-wallet-strategy-registry',
+      externalProviderCalled: false,
+      strategyId: strategy?.id ?? (strategyId || 'all-wrappers'),
+      strategyVersion: strategy?.version ?? null,
+      okxSkillCount: new Set(
+        composition.map((item) => item.okxSkill).filter(Boolean),
+      ).size,
+      wrapperCount: composition.length,
+      composition,
+      rule:
+        'H Wallet 负责策略顺序、授权范围、风控门和卡片语义；OKX skill 负责底层能力输出。',
+    },
+  })
+}
+
+async function invokeSignalReadOnchainSignals(wrapper, input) {
+  const validation = validateSignalInput(input)
+
+  if (!validation.ok) {
+    return recordBlockedInvocation({
+      wrapper,
+      input,
+      code: validation.code,
+      message: validation.message,
+      resultData: {
+        signalGate: 'blocked',
+        signalProvider: 'okx-dex-signal',
+        action: 'block',
+        reason: validation.message,
+      },
+    })
+  }
+
+  return recordBlockedInvocation({
+    wrapper,
+    input,
+    code: 'dex-signal-adapter-not-connected',
+    message:
+      '链上信号读取协议已识别；真实 okx-dex-signal adapter 尚未接入。H Wallet 不伪造信号。',
+    resultData: {
+      signalGate: 'blocked',
+      signalProvider: 'okx-dex-signal',
+      action: 'block',
+      failSafe: true,
+      requiredProviderSkill: 'okx-dex-signal',
+    },
+  })
+}
+
+async function invokeTokenAnalyzeRisk(wrapper, input) {
+  const validation = validateTokenAnalysisInput(input)
+
+  if (!validation.ok) {
+    return recordBlockedInvocation({
+      wrapper,
+      input,
+      code: validation.code,
+      message: validation.message,
+      resultData: {
+        tokenGate: 'blocked',
+        tokenProvider: 'okx-dex-token',
+        action: 'block',
+        reason: validation.message,
+      },
+    })
+  }
+
+  return recordBlockedInvocation({
+    wrapper,
+    input,
+    code: 'dex-token-adapter-not-connected',
+    message:
+      '代币画像协议已识别；真实 okx-dex-token adapter 尚未接入。H Wallet 不伪造风险标签或持仓画像。',
+    resultData: {
+      tokenGate: 'blocked',
+      tokenProvider: 'okx-dex-token',
+      action: 'block',
+      failSafe: true,
+      requiredProviderSkill: 'okx-dex-token',
+    },
+  })
+}
+
+async function invokeMarketReadDexTrends(wrapper, input) {
+  const validation = validateMarketTrendInput(input)
+
+  if (!validation.ok) {
+    return recordBlockedInvocation({
+      wrapper,
+      input,
+      code: validation.code,
+      message: validation.message,
+      resultData: {
+        marketGate: 'blocked',
+        marketProvider: 'okx-dex-market',
+        action: 'block',
+        reason: validation.message,
+      },
+    })
+  }
+
+  return recordBlockedInvocation({
+    wrapper,
+    input,
+    code: 'dex-market-adapter-not-connected',
+    message:
+      'DEX 市场趋势协议已识别；真实 okx-dex-market adapter 尚未接入。H Wallet 不伪造行情或趋势。',
+    resultData: {
+      marketGate: 'blocked',
+      marketProvider: 'okx-dex-market',
+      action: 'block',
+      failSafe: true,
+      requiredProviderSkill: 'okx-dex-market',
     },
   })
 }
@@ -777,6 +945,93 @@ function validateRiskScanInput(input) {
       ok: false,
       code: 'risk-scan-transaction-required',
       message: '风险扫描需要 transaction 或 calldata。',
+    }
+  }
+
+  return { ok: true }
+}
+
+function validateSignalInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {
+      ok: false,
+      code: 'signal-input-required',
+      message: '链上信号读取需要策略或市场上下文输入。',
+    }
+  }
+
+  const strategyId = normalizeString(input.strategyId)
+  const token = normalizeString(input.token)
+  const tokenAddress = normalizeString(input.tokenAddress)
+  const chain = normalizeString(input.chain)
+  const watchlistId = normalizeString(input.watchlistId)
+
+  if (!strategyId && !token && !tokenAddress && !chain && !watchlistId) {
+    return {
+      ok: false,
+      code: 'signal-context-required',
+      message:
+        '链上信号读取需要 strategyId、token、tokenAddress、chain 或 watchlistId。',
+    }
+  }
+
+  return { ok: true }
+}
+
+function validateTokenAnalysisInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {
+      ok: false,
+      code: 'token-analysis-input-required',
+      message: '代币画像分析需要 token 上下文输入。',
+    }
+  }
+
+  const token = normalizeString(input.token)
+  const tokenAddress = normalizeString(input.tokenAddress)
+  const chain = normalizeString(input.chain)
+  const chainIndex = normalizeString(input.chainIndex)
+
+  if (!token && !tokenAddress) {
+    return {
+      ok: false,
+      code: 'token-analysis-token-required',
+      message: '代币画像分析需要 token 或 tokenAddress。',
+    }
+  }
+
+  if (!chain && !chainIndex) {
+    return {
+      ok: false,
+      code: 'token-analysis-chain-required',
+      message: '代币画像分析需要 chain 或 chainIndex。',
+    }
+  }
+
+  return { ok: true }
+}
+
+function validateMarketTrendInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {
+      ok: false,
+      code: 'market-trend-input-required',
+      message: 'DEX 市场趋势读取需要市场上下文输入。',
+    }
+  }
+
+  const strategyId = normalizeString(input.strategyId)
+  const token = normalizeString(input.token)
+  const tokenAddress = normalizeString(input.tokenAddress)
+  const chain = normalizeString(input.chain)
+  const chainIndex = normalizeString(input.chainIndex)
+
+  if (!strategyId && !token && !tokenAddress && !chain && !chainIndex) {
+    return {
+      ok: false,
+      code: 'market-trend-context-required',
+      message:
+        'DEX 市场趋势读取需要 strategyId、token、tokenAddress、chain 或 chainIndex。',
     }
   }
 

@@ -32,7 +32,10 @@ import { ConversationDataCard } from '../../src/features/cards/components/Conver
 import { useCardLibrary } from '../../src/features/cards/hooks/useCardLibrary'
 import { getConfirmationQueueStats } from '../../src/features/cards/model/confirmationQueue'
 import { isApiConfigured } from '../../src/services/api/httpClient'
-import type { AgentRunnerStatus } from '../../src/services/agent/types'
+import type {
+  AgentRunnerStatus,
+  OkxSkillCompositionStep,
+} from '../../src/services/agent/types'
 
 export default function AgentScreen() {
   const [command, setCommand] = useState(earningAgentPrimaryCommand)
@@ -110,10 +113,17 @@ export default function AgentScreen() {
                   H Skill
                 </AppText>
                 <AppText variant="caption" color="goldBright">
-                  {strategy.requiredSkillWrappers.length} 个
+                  {strategy.okxSkillComposition?.length ??
+                    strategy.requiredSkillWrappers.length}{' '}
+                  步
                 </AppText>
               </View>
             </View>
+            {strategy.okxSkillComposition?.length ? (
+              <OkxCompositionStrip
+                composition={strategy.okxSkillComposition}
+              />
+            ) : null}
             <Button
               fullWidth
               disabled={!backendConfigured || startStrategy.isPending}
@@ -414,7 +424,18 @@ function AgentStatusCard({
             <ShieldCheck color={theme.colors.goldBright} size={18} />
             <View style={styles.digestCopy}>
               <AppText variant="caption" color="textMuted">
-                暂停原因
+                OKX Skill 组合
+              </AppText>
+              <AppText color="textSecondary">
+                {formatCompositionDigest(currentRun.okxSkillComposition)}
+              </AppText>
+            </View>
+          </View>
+          <View style={styles.digestRow}>
+            <ShieldCheck color={theme.colors.goldBright} size={18} />
+            <View style={styles.digestCopy}>
+              <AppText variant="caption" color="textMuted">
+                安全检查点
               </AppText>
               <AppText color="textSecondary">
                 {currentRun.blockReason ?? currentStep?.detail ?? '等待下一步。'}
@@ -549,6 +570,70 @@ function formatRiskLevel(riskLevel: string) {
   return labels[riskLevel] ?? riskLevel
 }
 
+function OkxCompositionStrip({
+  composition,
+}: {
+  composition: OkxSkillCompositionStep[]
+}) {
+  const visibleItems = composition.slice(0, 4)
+  const hiddenCount = composition.length - visibleItems.length
+
+  return (
+    <View style={styles.compositionPanel}>
+      <View style={styles.compositionHeader}>
+        <AppText variant="caption" color="textMuted">
+          OKX Skill 组合
+        </AppText>
+        <AppText variant="caption" color="goldBright">
+          {composition.length} 步
+        </AppText>
+      </View>
+      <View style={styles.compositionChips}>
+        {visibleItems.map((item) => (
+          <View key={item.id} style={styles.compositionChip}>
+            <AppText variant="caption" color="goldBright">
+              {formatOkxSkillLabel(item.okxSkill)}
+            </AppText>
+          </View>
+        ))}
+        {hiddenCount > 0 ? (
+          <View style={styles.compositionChipMuted}>
+            <AppText variant="caption" color="textMuted">
+              +{hiddenCount}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  )
+}
+
+function formatCompositionDigest(composition?: OkxSkillCompositionStep[]) {
+  if (!composition?.length) {
+    return '等待策略组合计划。'
+  }
+
+  const okxSkillCount = new Set(composition.map((item) => item.okxSkill)).size
+
+  return `${composition.length} 个步骤，组合 ${okxSkillCount} 个 OKX Skill。复杂过程会折叠，用户只看确认卡和结果卡。`
+}
+
+function formatOkxSkillLabel(skillId: string) {
+  const labels: Record<string, string> = {
+    'okx-agentic-wallet': '代理钱包',
+    'okx-dex-market': '市场趋势',
+    'okx-dex-signal': '链上信号',
+    'okx-dex-strategy': '策略订单',
+    'okx-dex-swap': '兑换',
+    'okx-dex-token': '代币画像',
+    'okx-defi-invest': 'DeFi',
+    'okx-onchain-gateway': '链上网关',
+    'okx-security': '安全扫描',
+  }
+
+  return labels[skillId] ?? skillId
+}
+
 function formatRunStatus(status: string) {
   const labels: Record<string, string> = {
     blocked: '已阻止',
@@ -655,6 +740,41 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surfaceTerminal,
     padding: theme.spacing.md,
+  },
+  compositionPanel: {
+    gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.borderMuted,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceTerminal,
+    padding: theme.spacing.md,
+  },
+  compositionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  compositionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  compositionChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+    borderRadius: theme.radius.sm,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+  },
+  compositionChipMuted: {
+    borderWidth: 1,
+    borderColor: theme.colors.borderMuted,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceElevated,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
   },
   bindingRow: {
     minHeight: 64,

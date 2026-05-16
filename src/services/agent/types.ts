@@ -110,6 +110,7 @@ export type HSkillInvocation = {
   executionMode:
     | 'dry-run-only'
     | 'read-only-adapter'
+    | 'strategy-composition'
     | 'transaction-build-adapter'
   createdAt: string
   inputSummary: Record<string, string>

@@ -32,6 +32,10 @@ H.agent.skillInvoke    → POST /api/h/v1/agent/skill-runtime/invoke
 H.agent.runner         → GET /api/h/v1/agent/runner
 H.agent.runs           → GET /api/h/v1/agent/runs
 H.agent.start          → POST /api/h/v1/agent/strategies/:id/start
+H.skill.strategy.plan  → H.skill.strategy.composePlan
+H.skill.signal.read    → H.skill.signal.readOnchainSignals
+H.skill.token.risk     → H.skill.token.analyzeRisk
+H.skill.market.trends  → H.skill.market.readDexTrends
 H.skill.cards.list     → GET /api/h/v1/cards
 H.skill.cards.confirm  → POST /api/h/v1/cards/:id/confirm
 H.skill.auth.me        → GET /api/h/v1/auth/me
