@@ -1,5 +1,9 @@
 const onchainosWalletAdapter = require('./onchainosWalletAdapter')
 const okxOnchainHttpClient = require('./okxOnchainHttpClient')
+const {
+  getHSkillAdapterBinding,
+  getReadyProviderMethods,
+} = require('./hSkillAdapterRegistry')
 
 const serverOnlyOkxEnv = [
   'OKX_PROJECT_ID',
@@ -28,7 +32,10 @@ const providerDefinitions = [
     transport: 'onchainos-cli',
     requiredEnv: ['H_AGENT_ONCHAINOS_AUTH_MODE', 'ONCHAINOS_CLI_PATH'],
     requiredFor: 'Agent Wallet 邮箱验证码登录、会话恢复、资产读取',
-    statusResolver: () => onchainosWalletAdapter.getStatus(),
+    statusResolver: () => ({
+      ...onchainosWalletAdapter.getStatus(),
+      supportedMethods: getReadyProviderMethods('okx-agentic-wallet'),
+    }),
   },
   {
     id: 'okx-dex-swap',
@@ -40,8 +47,8 @@ const providerDefinitions = [
     statusResolver: () =>
       okxOnchainHttpClient.getProviderStatus({
         limitation:
-          '当前开放 quote、swap data 和 transaction history；签名、广播和最终执行仍由授权链路锁定。',
-        supportedMethods: ['quote', 'swapData', 'history'],
+          '当前开放 quote 和 swap data；签名、广播和最终执行仍由授权链路锁定。',
+        supportedMethods: getReadyProviderMethods('okx-dex-swap'),
       }),
   },
   {
@@ -75,6 +82,12 @@ const providerDefinitions = [
     transport: 'okx-onchainos-skill',
     requiredEnv: serverOnlyOkxEnv,
     requiredFor: 'DEX 行情、K 线、趋势和市场观察',
+    statusResolver: () =>
+      okxOnchainHttpClient.getProviderStatus({
+        limitation:
+          '当前开放 Hot Token 只读趋势读取；不会从市场数据直接触发资产动作。',
+        supportedMethods: getReadyProviderMethods('okx-dex-market'),
+      }),
   },
   {
     id: 'okx-security',
@@ -95,7 +108,7 @@ const providerDefinitions = [
       okxOnchainHttpClient.getProviderStatus({
         limitation:
           '当前只开放 simulate 和 DEX txHash 状态追踪；broadcast 仍由授权链路锁定。',
-        supportedMethods: ['simulate', 'trackOrder'],
+        supportedMethods: getReadyProviderMethods('okx-onchain-gateway'),
       }),
   },
   {
@@ -120,6 +133,7 @@ function getOkxProviderAdapter(providerId) {
 
 function getHSkillBindingStatus(wrapper) {
   const provider = getOkxProviderAdapter(wrapper.providerSkill)
+  const binding = getHSkillAdapterBinding(wrapper.id)
 
   if (!provider) {
     return {
@@ -128,6 +142,20 @@ function getHSkillBindingStatus(wrapper) {
       providerSkill: wrapper.providerSkill,
       reason: 'H Skill Wrapper 指向的 provider 未注册。',
       status: 'blocked',
+    }
+  }
+
+  if (!binding) {
+    return {
+      adapterStatus: 'unknown',
+      credentialBoundary: provider.credentialBoundary,
+      credentialLabel: provider.credentialLabel,
+      hSkillWrapperId: wrapper.id,
+      providerSkill: wrapper.providerSkill,
+      providerLabel: provider.label,
+      reason: 'H Skill Wrapper 尚未注册 provider adapter binding。',
+      status: 'blocked',
+      wrapperStatus: wrapper.status,
     }
   }
 
@@ -140,7 +168,7 @@ function getHSkillBindingStatus(wrapper) {
       credentialBoundary: provider.credentialBoundary,
       credentialLabel: provider.credentialLabel,
       hSkillWrapperId: wrapper.id,
-      requiredProviderMethod: null,
+      requiredProviderMethod: binding.providerMethod,
       providerSkill: wrapper.providerSkill,
       providerLabel: provider.label,
       reason: localRuntimeReady.reason,
@@ -149,27 +177,38 @@ function getHSkillBindingStatus(wrapper) {
     }
   }
 
-  const requiredProviderMethod = getWrapperRequiredProviderMethod(wrapper.id)
+  const requiredProviderMethod = binding.providerMethod
+  const bindingReady = binding.adapterStatus === 'ready'
   const methodReady =
     !requiredProviderMethod ||
     !Array.isArray(provider.supportedMethods) ||
     provider.supportedMethods.includes(requiredProviderMethod)
-  const adapterReady = provider.status === 'ready' && methodReady
+  const providerReady = provider.status === 'ready'
+  const adapterReady = providerReady && methodReady && bindingReady
+  const ready = contractReady && adapterReady
 
   return {
-    adapterStatus: provider.status,
+    adapterStatus: binding.adapterStatus,
+    adapterExecutionMode: binding.executionMode,
+    adapterFailStrategy: binding.failStrategy,
+    adapterUserVisibleMode: binding.userVisibleMode,
     credentialBoundary: provider.credentialBoundary,
     credentialLabel: provider.credentialLabel,
     hSkillWrapperId: wrapper.id,
     requiredProviderMethod,
+    providerConnectionStatus: provider.status,
     providerSkill: wrapper.providerSkill,
     providerLabel: provider.label,
-    reason: adapterReady
+    reason: ready
       ? 'Provider adapter 已就绪。'
-      : methodReady
-        ? provider.reason
-        : `Provider adapter 已接入，但 ${requiredProviderMethod} 方法仍未开放。`,
-    status: contractReady && adapterReady ? 'ready' : 'blocked',
+      : !contractReady
+        ? `H Skill Wrapper 当前状态为 ${wrapper.status}，产品执行面还未开放。`
+        : !bindingReady
+          ? getBindingBlockedReason(binding)
+          : methodReady
+            ? provider.reason
+            : `Provider adapter 已接入，但 ${requiredProviderMethod} 方法仍未开放。`,
+    status: ready ? 'ready' : 'blocked',
     wrapperStatus: wrapper.status,
   }
 }
@@ -270,16 +309,16 @@ function getExpectedValue(envName) {
   return 'server-only'
 }
 
-function getWrapperRequiredProviderMethod(wrapperId) {
-  const methodMap = {
-    'H.skill.swap.quote': 'quote',
-    'H.skill.swap.execute': 'swapData',
-    'H.skill.gateway.simulate': 'simulate',
-    'H.skill.gateway.broadcast': 'broadcast',
-    'H.skill.gateway.trackOrder': 'trackOrder',
+function getBindingBlockedReason(binding) {
+  if (binding.adapterStatus === 'adapter-shell') {
+    return 'H Skill Adapter binding 已注册，但真实 provider adapter 调用仍未接入。'
   }
 
-  return methodMap[wrapperId] ?? null
+  if (binding.adapterStatus === 'blocked-until-authorization-runtime') {
+    return 'H Skill Adapter binding 已注册，但必须等待授权运行时和执行回执链路开放。'
+  }
+
+  return `H Skill Adapter binding 状态为 ${binding.adapterStatus}，暂不能执行。`
 }
 
 module.exports = {

@@ -65,9 +65,9 @@ H Skill Wrapper
 ```
 
 The registry currently tracks `okx-agentic-wallet`, `okx-dex-swap`,
-`okx-security`, `okx-onchain-gateway`, and `okx-defi-invest`. Screens may show
-registry status, but they must not branch into provider commands or hold
-provider secrets.
+`okx-dex-market`, `okx-security`, `okx-onchain-gateway`, and
+`okx-defi-invest`. Screens may show registry status, but they must not branch
+into provider commands or hold provider secrets.
 
 OKX Project/API credentials are marked as the `H Wallet 官方接入` server
 channel. This means provider calls are made through H Wallet's official backend
@@ -137,6 +137,13 @@ The first read-only invoke target is `H.skill.wallet.getPortfolio`. It maps to
 `okx-agentic-wallet` / `onchainos wallet balance` because it reads the current
 logged-in Agent Wallet. Address-based portfolio lookup is a different wrapper
 and should use `okx-wallet-portfolio` when introduced.
+
+`H.skill.market.readDexTrends` maps to `okx-dex-market` / OKX Hot Token API.
+It is a read-only strategy input. The backend sends a server-only signed
+request to `/api/v6/dex/market/token/hot-token`, normalizes the returned list
+into H Wallet market trend rows, and records the invocation. If OKX returns a
+non-success code, an empty response, or a provider error, H Wallet must not
+invent market data.
 
 The first risk-gate invoke target is `H.skill.risk.scanTransaction`. It maps to
 `okx-security` / `onchainos security tx-scan`. Until the real adapter is

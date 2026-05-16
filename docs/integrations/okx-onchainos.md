@@ -31,6 +31,7 @@ Ready now:
 * Card Library recording for generated cards
 * OKX DEX quote adapter boundary
 * OKX DEX swap-data adapter boundary
+* OKX DEX Hot Token market-trend adapter boundary
 * OKX Transaction API simulation adapter boundary
 * OKX DEX transaction status tracking boundary
 
@@ -131,11 +132,12 @@ aggregation, quote output, swap data generation, and transaction-status lookup;
 H Wallet owns AI UX, authorization policy, card records, and backend adapter
 security.
 
-Official OKX Swap endpoints to integrate later:
+Official OKX Onchain endpoints:
 
 * Quote: `GET /api/v6/dex/aggregator/quote`
 * Swap data: `GET /api/v6/dex/aggregator/swap`
 * Transaction status: `GET /api/v6/dex/aggregator/history`
+* DEX market trends: `GET /api/v6/dex/market/token/hot-token`
 
 These calls stay server-side behind H Wallet APIs.
 
@@ -153,6 +155,12 @@ H.skill.swap.execute
 → OKX DEX swap transaction data
 → H Wallet normalized invocation result
 → still unsigned and unbroadcast
+
+H.skill.market.readDexTrends
+→ server-only OKX signed request
+→ OKX Hot Token response
+→ H Wallet normalized market trend rows
+→ read-only strategy input
 ```
 
 Quote failures, missing token contract addresses, or provider errors return a

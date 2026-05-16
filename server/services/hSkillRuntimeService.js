@@ -353,20 +353,66 @@ async function invokeMarketReadDexTrends(wrapper, input) {
     })
   }
 
-  return recordBlockedInvocation({
-    wrapper,
-    input,
-    code: 'dex-market-adapter-not-connected',
-    message:
-      'DEX 市场趋势协议已识别；真实 okx-dex-market adapter 尚未接入。H Wallet 不伪造行情或趋势。',
-    resultData: {
-      marketGate: 'blocked',
-      marketProvider: 'okx-dex-market',
-      action: 'block',
-      failSafe: true,
-      requiredProviderSkill: 'okx-dex-market',
-    },
-  })
+  try {
+    const requestInput = mapMarketTrendInput(input)
+    const output = await okxOnchainHttpClient.getHotTokens(requestInput)
+
+    if (!output.ok) {
+      return recordBlockedInvocation({
+        wrapper,
+        input,
+        code: 'okx-dex-market-hot-token-rejected',
+        message:
+          'OKX Hot Token API 未返回成功结果，H Wallet 不生成自有行情或趋势。',
+        resultData: {
+          marketGate: 'blocked',
+          marketProvider: 'okx-dex-market',
+          action: 'block',
+          failSafe: true,
+          providerResponse: output.response,
+        },
+      })
+    }
+
+    const trends = normalizeOkxHotTokenTrends(output.response)
+
+    return recordCompletedInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-market-hot-token-completed',
+      message: trends.length
+        ? '已通过 OKX Hot Token API 读取真实 DEX 市场趋势。'
+        : 'OKX Hot Token API 已返回成功结果；当前筛选条件下暂无趋势数据。',
+      resultData: {
+        marketGate: 'completed',
+        marketProvider: 'okx-dex-market',
+        action: 'observe',
+        provider: 'okx-dex-market',
+        source: 'okx-onchainos-api',
+        request: output.request,
+        requestContext: requestInput.context,
+        trendCount: trends.length,
+        trends,
+        providerResponse: output.response,
+      },
+    })
+  } catch (error) {
+    return recordProviderErrorInvocation({
+      wrapper,
+      input,
+      code: 'okx-dex-market-hot-token-error',
+      fallbackMessage:
+        'OKX Hot Token API 请求失败。H Wallet 不生成自有行情或趋势。',
+      error,
+      resultData: {
+        marketGate: 'blocked',
+        marketProvider: 'okx-dex-market',
+        action: 'block',
+        failSafe: true,
+        requiredProviderSkill: 'okx-dex-market',
+      },
+    })
+  }
 }
 
 async function invokeGatewaySimulate(wrapper, input) {
@@ -1437,6 +1483,201 @@ function validateDefiClaimInput(input) {
   }
 
   return { ok: true }
+}
+
+function mapMarketTrendInput(input) {
+  const strategyId = normalizeString(input.strategyId)
+  const strategy = strategyId
+    ? strategySkillRepository.findStrategyById(strategyId)
+    : null
+  const requestedChain = normalizeString(input.chain)
+  const requestedChainIndex = normalizeString(input.chainIndex)
+  const strategyDefaultChain =
+    !requestedChain && !requestedChainIndex
+      ? getStrategyDefaultMarketChain(strategy)
+      : ''
+  const chain = requestedChain || strategyDefaultChain
+
+  return {
+    chain,
+    chainIndex: requestedChainIndex,
+    cursor: normalizeString(input.cursor),
+    limit: normalizeString(input.limit) || '10',
+    liquidityMax: input.liquidityMax,
+    liquidityMin: input.liquidityMin,
+    marketCapMax: input.marketCapMax,
+    marketCapMin: input.marketCapMin,
+    priceChangePercentMax: input.priceChangePercentMax,
+    priceChangePercentMin: input.priceChangePercentMin,
+    rankingTimeFrame: normalizeString(input.rankingTimeFrame) || '2',
+    rankingType: normalizeString(input.rankingType) || '4',
+    riskFilter:
+      typeof input.riskFilter === 'boolean' ? input.riskFilter : true,
+    stableTokenFilter:
+      typeof input.stableTokenFilter === 'boolean'
+        ? input.stableTokenFilter
+        : true,
+    tradeAmountMax: input.tradeAmountMax,
+    tradeAmountMin: input.tradeAmountMin,
+    txsMax: input.txsMax,
+    txsMin: input.txsMin,
+    uniqueTraderMax: input.uniqueTraderMax,
+    uniqueTraderMin: input.uniqueTraderMin,
+    volumeMax: input.volumeMax,
+    volumeMin: input.volumeMin,
+    context: {
+      defaultChainApplied: Boolean(strategyDefaultChain),
+      marketInputType: getMarketInputType(input),
+      strategyId: strategy?.id ?? (strategyId || null),
+      strategyVersion: strategy?.version ?? null,
+      token: normalizeString(input.token) || null,
+      tokenAddress: normalizeString(input.tokenAddress) || null,
+      chain: chain || null,
+      chainIndex: requestedChainIndex || null,
+    },
+  }
+}
+
+function getStrategyDefaultMarketChain(strategy) {
+  if (!strategy || !Array.isArray(strategy.supportedChains)) {
+    return ''
+  }
+
+  const xLayer = strategy.supportedChains.find(
+    (chain) => normalizeString(chain).toLowerCase() === 'x layer',
+  )
+
+  return xLayer || strategy.supportedChains[0] || ''
+}
+
+function getMarketInputType(input) {
+  if (normalizeString(input.strategyId)) {
+    return 'strategy'
+  }
+
+  if (normalizeString(input.tokenAddress)) {
+    return 'token-address'
+  }
+
+  if (normalizeString(input.token)) {
+    return 'token'
+  }
+
+  if (normalizeString(input.chain) || normalizeString(input.chainIndex)) {
+    return 'chain'
+  }
+
+  return 'unknown'
+}
+
+function normalizeOkxHotTokenTrends(response) {
+  return getOkxResponseRows(response)
+    .map((row, index) => normalizeOkxHotTokenTrend(row, index))
+    .filter(Boolean)
+}
+
+function normalizeOkxHotTokenTrend(row, index) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return null
+  }
+
+  return removeEmptyFields({
+    listPosition: index + 1,
+    chainIndex: pickFirst(row, ['chainIndex', 'chainId']),
+    chainName: pickFirst(row, ['chainName', 'networkName']),
+    tokenSymbol: pickFirst(row, [
+      'tokenSymbol',
+      'symbol',
+      'ticker',
+      'baseTokenSymbol',
+    ]),
+    tokenName: pickFirst(row, ['tokenName', 'name', 'baseTokenName']),
+    tokenAddress: pickFirst(row, [
+      'tokenContractAddress',
+      'tokenAddress',
+      'contractAddress',
+      'address',
+    ]),
+    priceUsd: pickFirst(row, ['priceUsd', 'price', 'tokenPrice', 'lastPrice']),
+    priceChangePercent: pickFirst(row, [
+      'priceChangePercent',
+      'priceChange24h',
+      'changePercent',
+      'priceChange',
+    ]),
+    volumeUsd: pickFirst(row, [
+      'volumeUsd',
+      'volume',
+      'volume24h',
+      'txVolumeUsd',
+      'tradeVolume',
+    ]),
+    liquidityUsd: pickFirst(row, ['liquidityUsd', 'liquidity']),
+    marketCapUsd: pickFirst(row, ['marketCapUsd', 'marketCap']),
+    holderCount: pickFirst(row, ['holderCount', 'holders']),
+    transactionCount: pickFirst(row, ['transactionCount', 'txCount', 'txs']),
+    uniqueTraderCount: pickFirst(row, [
+      'uniqueTraderCount',
+      'uniqueTrader',
+      'uniqueTraders',
+    ]),
+    riskControlLevel: pickFirst(row, ['riskControlLevel', 'riskLevel']),
+    tags: pickFirst(row, ['tokenTags', 'tags']),
+  })
+}
+
+function getOkxResponseRows(response) {
+  const data = response?.data
+
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (!data || typeof data !== 'object') {
+    return []
+  }
+
+  const listKeys = [
+    'data',
+    'list',
+    'tokens',
+    'tokenList',
+    'hotTokenList',
+    'items',
+    'rankings',
+  ]
+
+  for (const key of listKeys) {
+    if (Array.isArray(data[key])) {
+      return data[key]
+    }
+  }
+
+  return []
+}
+
+function pickFirst(source, keys) {
+  for (const key of keys) {
+    const value = source[key]
+
+    if (value !== null && value !== undefined && value !== '') {
+      return value
+    }
+  }
+
+  return null
+}
+
+function removeEmptyFields(input) {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => {
+      if (value === null || value === undefined) {
+        return false
+      }
+
+      return typeof value !== 'string' || value.trim().length > 0
+    }),
+  )
 }
 
 function mapSwapQuoteInput(input) {

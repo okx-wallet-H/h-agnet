@@ -76,6 +76,89 @@ async function getSwapQuote(input) {
   })
 }
 
+async function getHotTokens(input = {}) {
+  return request('GET', '/api/v6/dex/market/token/hot-token', {
+    chainIndex: input.chainIndex
+      ? normalizeChainIndex(input.chainIndex)
+      : input.chain
+        ? normalizeChainIndex(input.chain)
+        : undefined,
+    rankingType: normalizeOptionalText(input.rankingType) ?? '4',
+    rankingTimeFrame: normalizeOptionalText(input.rankingTimeFrame) ?? '2',
+    rankBy: input.rankBy,
+    riskFilter:
+      typeof input.riskFilter === 'boolean'
+        ? String(input.riskFilter)
+        : (input.riskFilter ?? 'true'),
+    stableTokenFilter:
+      typeof input.stableTokenFilter === 'boolean'
+        ? String(input.stableTokenFilter)
+        : (input.stableTokenFilter ?? 'true'),
+    limit: normalizeOptionalText(input.limit) ?? '10',
+    cursor: input.cursor,
+    priceChangePercentMin: input.priceChangePercentMin,
+    priceChangePercentMax: input.priceChangePercentMax,
+    tradeAmountMin: input.tradeAmountMin,
+    tradeAmountMax: input.tradeAmountMax,
+    volumeMin: input.volumeMin,
+    volumeMax: input.volumeMax,
+    txsMin: input.txsMin,
+    txsMax: input.txsMax,
+    uniqueTraderMin: input.uniqueTraderMin,
+    uniqueTraderMax: input.uniqueTraderMax,
+    marketCapMin: input.marketCapMin,
+    marketCapMax: input.marketCapMax,
+    liquidityMin: input.liquidityMin,
+    liquidityMax: input.liquidityMax,
+    holdersMin: input.holdersMin,
+    holdersMax: input.holdersMax,
+    top10HoldPercentMin: input.top10HoldPercentMin,
+    top10HoldPercentMax: input.top10HoldPercentMax,
+    inflowUsdMin: input.inflowUsdMin,
+    inflowUsdMax: input.inflowUsdMax,
+  })
+}
+
+async function getSignalSupportedChains() {
+  return request('GET', '/api/v6/dex/market/signal/supported/chain', {})
+}
+
+async function getSignalList(input = {}) {
+  return request('POST', '/api/v6/dex/market/signal/list', {
+    chainIndex: normalizeChainIndex(input.chainIndex ?? input.chain),
+    walletType: normalizeOptionalText(input.walletType) ?? '1,2,3',
+    limit: normalizeOptionalText(input.limit) ?? '10',
+    cursor: input.cursor,
+    maxAddressCount: input.maxAddressCount,
+    maxAmountUsd: input.maxAmountUsd,
+    maxLiquidityUsd: input.maxLiquidityUsd,
+    maxMarketCapUsd: input.maxMarketCapUsd,
+    minAddressCount: input.minAddressCount,
+    minAmountUsd: input.minAmountUsd,
+    minLiquidityUsd: input.minLiquidityUsd,
+    minMarketCapUsd: input.minMarketCapUsd,
+    tokenAddress: input.tokenAddress,
+  })
+}
+
+async function searchTokens(input = {}) {
+  return request('GET', '/api/v6/dex/market/token/search', {
+    chains: normalizeRequiredText(
+      input.chains ??
+        input.chainIndexes ??
+        input.chainIndex ??
+        input.chain,
+      'chains',
+    )
+      .split(',')
+      .map((chain) => normalizeChainIndex(chain))
+      .join(','),
+    search: normalizeRequiredText(input.search ?? input.token, 'search'),
+    cursor: input.cursor,
+    limit: normalizeOptionalText(input.limit) ?? '20',
+  })
+}
+
 async function getSwapData(input) {
   return request('GET', '/api/v6/dex/aggregator/swap', {
     amount: normalizeRequiredText(input.amount, 'amount'),
@@ -316,7 +399,11 @@ function parseJson(text) {
 
 module.exports = {
   getProviderStatus,
+  getHotTokens,
+  getSignalList,
+  getSignalSupportedChains,
   getStatus,
+  searchTokens,
   getSwapData,
   getSwapHistory,
   getSwapQuote,
