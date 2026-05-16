@@ -14,7 +14,6 @@ const allowedMetricPaths = [
   'activeCards',
   'activity.tradeCards',
   'completion.verifiedResults',
-  'confirmations.confirmed',
   'receipts.pendingExecution',
 ]
 
@@ -59,7 +58,7 @@ const defaultSideQuestRules = [
     description: '交易进入执行通道累计 3 次，证明你开始使用 Agent 赚币流程。',
     category: 'execution',
     rewardLabel: 'Agent 执行员',
-    metricPath: 'confirmations.confirmed',
+    metricPath: 'receipts.pendingExecution',
     target: 3,
     unit: '张',
     enabled: true,

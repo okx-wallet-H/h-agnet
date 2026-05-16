@@ -265,8 +265,9 @@ Agent Wallet permissions.
 The Card Library is the trade activity ledger for the product. H Wallet may
 create many conversation cards, but only trading cards enter the Card Library:
 
-* trade-confirmation cards that are already in execution scope
-  (`agent-authorized`, `confirmed`, or `pending-execution`).
+* trade-confirmation cards with `pending-execution`, meaning OKX/onchain
+  execution data or a real execution process exists but final success has not
+  been verified yet.
 * trade-success cards after verified completion.
 
 Startup cards, preflight cards, wallet cards, side quest cards, portfolio
@@ -290,8 +291,7 @@ server-side. Screens must not decide card ownership.
 Card Library stats keep the legacy response shape for app compatibility, but
 the counters are derived only from the eligible trading subset:
 
-* `confirmations`: trade cards that are already authorized or waiting for
-  execution.
+* `confirmations`: trade cards waiting for execution.
 * `receipts`: compatibility object; receipt cards are not Card Library records.
 * `activity`: trade card counts; non-trade activity counters stay at zero.
 * `completion`: verified trade-success cards and in-progress trade counts.

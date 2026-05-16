@@ -56,8 +56,6 @@ const confirmationCardTypes = new Set([
 ])
 
 const cardLibraryTradeInProgressStatuses = new Set([
-  'agent-authorized',
-  'confirmed',
   'pending-execution',
 ])
 

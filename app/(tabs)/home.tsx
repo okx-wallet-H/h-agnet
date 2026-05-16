@@ -580,10 +580,7 @@ function CommunityView() {
           <CommunityStat label="交易卡" value={String(stats.totalCards)} />
           <CommunityStat
             label="交易中"
-            value={String(
-              stats.confirmations.confirmed +
-                (stats.confirmations.pendingExecution ?? 0),
-            )}
+            value={String(stats.confirmations.pendingExecution ?? 0)}
           />
         </View>
       </TerminalCard>

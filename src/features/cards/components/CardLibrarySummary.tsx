@@ -54,9 +54,11 @@ export function CardLibrarySummary({ stats }: CardLibrarySummaryProps) {
         <MetricRow label="交易卡片" value={String(stats.activity.tradeCards)} />
         <MetricRow
           label="交易中"
-          value={String(stats.confirmations.confirmed)}
+          value={String(stats.confirmations.pendingExecution ?? 0)}
           valueColor={
-            stats.confirmations.confirmed > 0 ? 'goldBright' : 'textMuted'
+            (stats.confirmations.pendingExecution ?? 0) > 0
+              ? 'goldBright'
+              : 'textMuted'
           }
         />
         <MetricRow

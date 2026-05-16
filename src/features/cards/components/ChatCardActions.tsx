@@ -275,9 +275,7 @@ function getPrimaryLabel(
 function isCardLibraryEligible(card: ConversationCard) {
   return (
     (card.type === 'trade-confirmation' &&
-      ['agent-authorized', 'confirmed', 'pending-execution'].includes(
-        card.status,
-      )) ||
+      card.status === 'pending-execution') ||
     (card.type === 'trade-success' && card.status === 'completed')
   )
 }

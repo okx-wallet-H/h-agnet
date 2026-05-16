@@ -13,7 +13,6 @@ const initialPublishedAt = new Date().toISOString()
 const allowedMetricPaths = [
   'activity.tradeCards',
   'completion.verifiedResults',
-  'confirmations.confirmed',
   'receipts.pendingExecution',
 ]
 
@@ -44,7 +43,7 @@ const defaultRules = [
     dimension: 'growth',
     label: '交易中',
     description: '交易进入授权范围或执行通道后，提升成长基础分。',
-    metricPath: 'confirmations.confirmed',
+    metricPath: 'receipts.pendingExecution',
     pointsPerUnit: 8,
     maxPoints: 24,
     sortOrder: 10,
@@ -88,7 +87,7 @@ const defaultRules = [
     dimension: 'task',
     label: '交易中',
     description: '交易中卡片用于支线任务的基础活跃判断。',
-    metricPath: 'confirmations.confirmed',
+    metricPath: 'receipts.pendingExecution',
     pointsPerUnit: 14,
     maxPoints: 42,
     sortOrder: 10,
@@ -110,7 +109,7 @@ const defaultRules = [
     dimension: 'trust',
     label: '交易中',
     description: '交易流程越清晰，可信度越稳定。',
-    metricPath: 'confirmations.confirmed',
+    metricPath: 'receipts.pendingExecution',
     pointsPerUnit: 8,
     maxPoints: 24,
     sortOrder: 10,

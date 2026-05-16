@@ -60,8 +60,7 @@ export default function CardLibraryScreen() {
     () => getFilteredCards(cards, filter),
     [cards, filter],
   )
-  const inProgressCount =
-    stats.confirmations.confirmed + (stats.confirmations.pendingExecution ?? 0)
+  const inProgressCount = stats.confirmations.pendingExecution ?? 0
   const visibleCards = cards.length > 0 ? filteredCards : [previewCard]
   const showFilteredEmpty = cards.length > 0 && filteredCards.length === 0
 
@@ -246,7 +245,7 @@ function getFilteredCards(cards: ConversationCard[], filter: CardFilter) {
 function isTradingInProgressCard(card: ConversationCard) {
   return (
     card.type === 'trade-confirmation' &&
-    ['agent-authorized', 'confirmed', 'pending-execution'].includes(card.status)
+    card.status === 'pending-execution'
   )
 }
 
