@@ -299,6 +299,13 @@ the counters are derived only from the eligible trading subset:
 Membership scoring may use trading-in-progress cards as activity signals, but
 only verified trade-success cards can represent real completed execution.
 
+When a user confirms a quote-ready trade card, the confirmation route may run a
+server-side continuation step. That step can only create a Card Library record
+after H Wallet has received OKX swap data and passed the pre-execution
+simulation gate. If OKX data, wallet context, authorization, or simulation is
+missing, the continuation writes a blocked conversation card instead of a Card
+Library card.
+
 Growth scoring v1 is exposed by `/boost/growth-summary`. It returns a
 transparent score, tier, task score, trust score, per-rule breakdown, recommended
 next actions, and safety caveats. It must stay derived from Card Library data

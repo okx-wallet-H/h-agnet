@@ -58,6 +58,12 @@ export type CardConfirmationResult = {
     status: string
   } | null
   card: ConversationCard
+  continuation?: {
+    assistantText?: string | null
+    reason?: string | null
+    stage?: string | null
+  } | null
+  followupCards?: ConversationCard[]
   receiptCard: ConversationCard
   runnerStatus?: {
     id: string

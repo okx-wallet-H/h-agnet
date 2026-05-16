@@ -2,6 +2,7 @@ const {
   evaluateAgentAuthorization,
 } = require('./agentAuthorizationPolicyService')
 const { createCard } = require('./cardsService')
+const { getAgentWalletSession } = require('./agentWalletAuthService')
 const { invokeHSkill } = require('./hSkillRuntimeService')
 
 const tokenRegistry = {
@@ -25,7 +26,7 @@ const tokenRegistry = {
 }
 
 async function prepareSwapPipeline(input) {
-  const intent = normalizeSwapIntent(input)
+  const intent = await normalizeSwapIntent(input)
   const authorization = evaluateAgentAuthorization({
     requiresAssetAction: true,
     scope: intent.authorizationScope,
@@ -143,13 +144,15 @@ async function prepareSwapPipeline(input) {
   })
 }
 
-function normalizeSwapIntent(input) {
+async function normalizeSwapIntent(input) {
   const chain = normalizeText(input?.chain) || 'ethereum'
   const fromToken = normalizeTokenSymbol(input?.fromToken)
   const toToken = normalizeTokenSymbol(input?.toToken)
   const amount = normalizeText(input?.amount)
   const slippagePercent = normalizeText(input?.slippagePercent) || '0.5'
-  const wallet = normalizeText(input?.wallet ?? input?.userWalletAddress)
+  const wallet =
+    normalizeText(input?.wallet ?? input?.userWalletAddress) ||
+    (await resolveDefaultWalletAddress(chain))
   const fromTokenInfo = resolveToken({ chain, token: fromToken })
   const toTokenInfo = resolveToken({ chain, token: toToken })
 
@@ -166,6 +169,24 @@ function normalizeSwapIntent(input) {
     toTokenAddress: normalizeText(input?.toTokenAddress) || toTokenInfo?.address,
     wallet,
   }
+}
+
+async function resolveDefaultWalletAddress(chain) {
+  const session = await getAgentWalletSession()
+
+  if (!session) {
+    return ''
+  }
+
+  if (isSolanaChain(chain)) {
+    return session.solAddress ?? ''
+  }
+
+  return session.evmAddress ?? session.solAddress ?? ''
+}
+
+function isSolanaChain(chain) {
+  return ['501', 'sol', 'solana'].includes(String(chain).trim().toLowerCase())
 }
 
 function getMissingSwapFields(intent) {

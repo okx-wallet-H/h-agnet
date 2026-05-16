@@ -167,6 +167,17 @@ export function ConfirmationDecisionPanel({
           <ConversationDataCard card={confirmationResult.receiptCard} />
         </View>
       ) : null}
+
+      {confirmationResult?.followupCards?.length ? (
+        <View style={styles.receiptStack}>
+          <AppText variant="caption" color="goldBright">
+            后续执行卡
+          </AppText>
+          {confirmationResult.followupCards.map((card) => (
+            <ConversationDataCard key={card.id} card={card} />
+          ))}
+        </View>
+      ) : null}
     </View>
   )
 }

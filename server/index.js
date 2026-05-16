@@ -24,6 +24,9 @@ const {
   prepareCardForConfirmation,
 } = require('./services/cardsService')
 const {
+  continueAfterCardConfirmation,
+} = require('./services/cardConfirmationContinuationService')
+const {
   getWalletAccount,
   getWalletAddresses,
   getWalletAssets,
@@ -356,11 +359,23 @@ async function handleRequest(request, response) {
     ) {
       const cardId = routePath.split('/')[2]
       const data = confirmCardReview(cardId)
+      const continuation = await continueAfterCardConfirmation(data.card)
 
       attachCardToConversationTurn(data.card.id, data.receiptCard)
+      continuation.cards.forEach((card) => {
+        attachCardToConversationTurn(data.card.id, card)
+      })
       sendJson(response, 200, {
         ok: true,
-        data,
+        data: {
+          ...data,
+          continuation: {
+            assistantText: continuation.assistantText,
+            reason: continuation.reason,
+            stage: continuation.stage,
+          },
+          followupCards: continuation.cards,
+        },
       })
       return
     }
