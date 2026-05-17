@@ -16,11 +16,13 @@ const { executeAgentCommand } = require('../server/agent/agentCommandPipeline')
 const { userRepository } = require('../server/repositories/userRepository')
 const {
   archiveCard,
+  confirmCardReview,
   createCard,
   createClientConversationCard,
   getCardLibraryStats,
   listCards,
   listConversationCards,
+  prepareCardForConfirmation,
 } = require('../server/services/cardsService')
 const {
   attachCardToConversationTurn,
@@ -680,6 +682,14 @@ async function smokeCardLibraryGrowthBoundary() {
   assert.equal(boostCard.metadata.nextQuest.id, 'trade-master')
   assert.equal(boostCard.metadata.nextQuest.status, 'active')
   assert.equal(boostCard.metadata.growth.score, growth.score)
+  assert.throws(
+    () => prepareCardForConfirmation(boostCard.id),
+    (error) => error.code === 'authorization-not-required',
+  )
+  assert.throws(
+    () => confirmCardReview(boostCard.id),
+    (error) => error.code === 'authorization-not-required',
+  )
   assert.equal(listCards().length, 2)
 
   return {
