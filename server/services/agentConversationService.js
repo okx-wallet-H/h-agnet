@@ -62,13 +62,17 @@ async function sendAgentConversationMessage(input) {
 }
 
 function listAgentConversationMessages() {
-  return agentConversationRepository.listMessages({ userId: getCurrentUserId() })
+  const userId = getCurrentUserId()
+
+  return userId ? agentConversationRepository.listMessages({ userId }) : []
 }
 
 function listAgentConversationTurns() {
-  return agentConversationRepository
-    .listTurns({ userId: getCurrentUserId() })
-    .map(hydrateTurn)
+  const userId = getCurrentUserId()
+
+  return userId
+    ? agentConversationRepository.listTurns({ userId }).map(hydrateTurn)
+    : []
 }
 
 function attachCardToConversationTurn(parentCardId, card) {

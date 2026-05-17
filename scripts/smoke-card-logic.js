@@ -42,6 +42,7 @@ async function main() {
   const conversationBoundary = await smokeConversationBoundary()
   const clientCardBoundary = smokeClientCardBoundary()
   const cardOwnershipBoundary = await smokeCardOwnershipBoundary()
+  const anonymousReadBoundary = await smokeAnonymousReadBoundary()
   const conversationOwnershipBoundary = await smokeConversationOwnershipBoundary()
   const conversationTurnLinking = await smokeConversationTurnLinking()
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
@@ -53,6 +54,7 @@ async function main() {
       {
         ok: true,
         authorizedBlockedPipeline,
+        anonymousReadBoundary,
         cardOwnershipBoundary,
         clientCardBoundary,
         conversationBoundary,
@@ -65,6 +67,37 @@ async function main() {
       2,
     ),
   )
+}
+
+async function smokeAnonymousReadBoundary() {
+  resetMemoryState()
+
+  createCard({
+    type: 'trade-confirmation',
+    status: 'pending-execution',
+    source: 'ai-agent',
+    title: '登录用户交易卡',
+    summary: '未登录状态不能读到这张卡。',
+    metrics: [{ label: '状态', value: '交易中', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'trading'],
+  })
+  await sendAgentConversationMessage({
+    content: '登录用户的一条对话。',
+  })
+
+  userRepository.hydrate([], null)
+
+  assert.equal(listCards().length, 0)
+  assert.equal(listConversationCards().length, 0)
+  assert.equal(getCardLibraryStats().totalCards, 0)
+  assert.equal(listAgentConversationTurns().length, 0)
+  assert.equal(listAgentConversationMessages().length, 0)
+
+  return {
+    anonymousCards: listCards().length,
+    anonymousConversationTurns: listAgentConversationTurns().length,
+  }
 }
 
 async function smokeCardOwnershipBoundary() {

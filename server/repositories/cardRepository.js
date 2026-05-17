@@ -15,9 +15,15 @@ function createCardRepository() {
 
       return card
     },
-    list({ userId } = {}) {
-      if (!userId) {
+    list(options = undefined) {
+      if (!options || !Object.hasOwn(options, 'userId')) {
         return cards
+      }
+
+      const userId = normalizeUserId(options.userId)
+
+      if (!userId) {
+        return []
       }
 
       return cards.filter((card) => card.userId === userId)
@@ -29,6 +35,10 @@ function createCardRepository() {
       persistCard(card)
     },
   }
+}
+
+function normalizeUserId(userId) {
+  return typeof userId === 'string' && userId.length > 0 ? userId : null
 }
 
 module.exports = {
