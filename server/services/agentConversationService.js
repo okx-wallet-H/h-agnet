@@ -84,12 +84,29 @@ function listAgentConversationTurns() {
 function attachCardToConversationTurn(parentCardId, card) {
   const turn = agentConversationRepository.findTurnByCardId(parentCardId)
 
-  if (!turn || turn.cardIds.includes(card.id)) {
+  if (
+    !turn ||
+    !card?.id ||
+    turn.cardIds.includes(card.id) ||
+    !canAttachCardToTurn(turn, card)
+  ) {
     return
   }
 
   turn.cardIds.push(card.id)
   agentConversationRepository.persistTurn(turn)
+}
+
+function canAttachCardToTurn(turn, card) {
+  if (turn.userId && card.userId) {
+    return turn.userId === card.userId
+  }
+
+  if (!turn.userId && card.userId) {
+    return false
+  }
+
+  return true
 }
 
 function hydrateTurn(turnRecord) {
@@ -107,7 +124,9 @@ function hydrateTurn(turnRecord) {
     processSteps: turnRecord.processSteps,
     cards: (turnRecord.cardIds ?? [])
       .map((cardId) => cardRepository.findById(cardId))
-      .filter(Boolean),
+      .filter(
+        (card) => card && canAttachCardToTurn(turnRecord, card),
+      ),
     executionPlan: turnRecord.executionPlan,
   }
 }

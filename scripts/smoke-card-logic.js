@@ -173,7 +173,7 @@ async function smokeCardOwnershipBoundary() {
 async function smokeConversationOwnershipBoundary() {
   const firstUser = resetMemoryState()
 
-  await sendAgentConversationMessage({
+  const firstTurn = await sendAgentConversationMessage({
     content: '第一位用户的记录。',
   })
 
@@ -186,6 +186,18 @@ async function smokeConversationOwnershipBoundary() {
   await sendAgentConversationMessage({
     content: '第二位用户的记录。',
   })
+  const secondUserCard = createCard({
+    type: 'portfolio-insight',
+    status: 'draft',
+    source: 'ai-agent',
+    title: '第二位用户的组合卡',
+    summary: '这张卡不能挂进第一位用户的对话。',
+    metrics: [{ label: '资产影响', value: '无', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'portfolio', 'ownership'],
+  })
+
+  attachCardToConversationTurn(firstTurn.cards[0].id, secondUserCard)
 
   assert.equal(listAgentConversationTurns().length, 1)
   assert.equal(listAgentConversationMessages().length, 2)
@@ -198,12 +210,14 @@ async function smokeConversationOwnershipBoundary() {
 
   assert.equal(listAgentConversationTurns().length, 1)
   assert.equal(listAgentConversationMessages().length, 2)
+  assert.equal(listAgentConversationTurns()[0].cards.length, 1)
   assert.equal(
     listAgentConversationTurns()[0].userMessage.content,
     '第一位用户的记录。',
   )
 
   return {
+    blockedCrossUserCardAttach: true,
     firstUserTurns: 1,
     secondUserTurns: 1,
   }
