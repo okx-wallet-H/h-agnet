@@ -83,6 +83,9 @@ H_AGENT_AI_API_KEY
 * Confirm whether the OKX Builder Code should be attached to production calls.
 * Confirm Agent Wallet OTP flow on the server machine.
 * Confirm which OKX OnchainOS skills are available to production credentials.
+* Keep `H_WALLET_EXECUTION_TOKEN` server-side only. It protects internal H Skill
+  invocation and execution-handoff routes; never put it in Expo or mobile
+  storage.
 
 ## Codex Tasks
 

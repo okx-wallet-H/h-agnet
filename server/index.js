@@ -256,6 +256,7 @@ async function handleRequest(request, response) {
       request.method === 'POST' &&
       routePath === '/agent/skill-runtime/invoke'
     ) {
+      requireExecutionRequest(request)
       const body = await readJsonBody(request)
       sendJson(response, 200, {
         ok: true,
