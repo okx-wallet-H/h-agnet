@@ -57,6 +57,9 @@ const {
   listSideQuests,
 } = require('../server/services/boostModuleService')
 const {
+  getAgentWalletSession,
+} = require('../server/services/agentWalletAuthService')
+const {
   evaluateAgentAuthorization,
   getAgentAuthorizationPolicySummary,
 } = require('../server/services/agentAuthorizationPolicyService')
@@ -90,6 +93,7 @@ async function main() {
   const sessionContextBoundary = await smokeSessionContextBoundary()
   const agentWalletAuthorizationBoundary =
     await smokeAgentWalletAuthorizationBoundary()
+  const agentWalletSessionBoundary = await smokeAgentWalletSessionBoundary()
 
   console.log(
     JSON.stringify(
@@ -97,6 +101,7 @@ async function main() {
         ok: true,
         authorizedBlockedPipeline,
         agentWalletAuthorizationBoundary,
+        agentWalletSessionBoundary,
         anonymousReadBoundary,
         cardOwnershipBoundary,
         cardLibraryGrowthBoundary,
@@ -872,6 +877,37 @@ async function smokeAgentWalletAuthorizationBoundary() {
     connectedWalletPolicyActive: true,
     disconnectedAuthorizationBlocked: true,
     disconnectedConfirmationRejected: true,
+  }
+}
+
+async function smokeAgentWalletSessionBoundary() {
+  const connectedUser = resetMemoryState()
+  const connectedSession = await getAgentWalletSession()
+
+  assert.equal(connectedSession.userId, connectedUser.id)
+  assert.equal(connectedSession.walletBindingStatus, 'connected')
+  assert.equal(
+    connectedSession.evmAddress,
+    '0x0000000000000000000000000000000000000001',
+  )
+
+  await runWithRequestUser(null, async () => {
+    assert.equal(await getAgentWalletSession(), null)
+  })
+
+  const secondUser = userRepository.upsertByEmail(
+    'session-walletless@h-wallet.local',
+    { displayName: 'Walletless User', status: 'otp-requested' },
+  )
+
+  await runWithRequestUser(secondUser.id, async () => {
+    assert.equal(await getAgentWalletSession(), null)
+  })
+
+  return {
+    anonymousSessionHidden: true,
+    connectedSessionVisible: true,
+    walletlessSessionHidden: true,
   }
 }
 

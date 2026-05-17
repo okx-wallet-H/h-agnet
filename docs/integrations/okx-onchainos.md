@@ -124,6 +124,10 @@ address can be reused after authorization; changing the address requires fresh
 authorization. OKX / OnchainOS confirming responses or risk blocks must still
 be surfaced to the user.
 
+Agent Wallet session reads are resolved from the current H Wallet session's
+stored wallet binding. Public app routes must not expose or bind the backend
+process' global OnchainOS CLI wallet session.
+
 No screen should directly call OKX, OnchainOS, wallet CLI commands, or provider
 SDKs.
 

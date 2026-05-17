@@ -486,6 +486,9 @@ Agent execution authorization is policy-based:
 * Asset actions require both an active H Wallet user session and a connected
   OKX Agent Wallet binding. OTP-requested users cannot grant strategy, trade,
   withdrawal, or transfer autonomy until wallet creation / restoration finishes.
+* Wallet session reads are user-scoped. The mobile app can only read the Agent
+  Wallet binding attached to its H Wallet session; it must not read a server
+  process or CLI global wallet session.
 * First trade authorization grants `trade-autonomy` for the current user.
 * A withdrawal or transfer address must be authorized before autonomous reuse.
 * A changed withdrawal or transfer address requires a new user authorization.

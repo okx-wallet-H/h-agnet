@@ -60,15 +60,24 @@ async function verifyAgentWalletOtp(input) {
 }
 
 async function getAgentWalletSession() {
-  const session = await onchainosWalletAdapter.getSession()
+  const identity = getCurrentUserIdentity()
 
-  if (!session) {
+  if (!identity?.agentWallet || identity.agentWallet.status !== 'connected') {
     return null
   }
 
-  const identity = bindAgentWalletSession(session)
-
-  return enrichAgentWalletSession(session, identity)
+  return enrichAgentWalletSession(
+    {
+      accountId: identity.agentWallet.accountId ?? undefined,
+      accountName: identity.agentWallet.accountName ?? undefined,
+      email: identity.agentWallet.email ?? identity.user.email,
+      evmAddress: identity.agentWallet.evmAddress ?? undefined,
+      loginType: identity.agentWallet.loginType ?? 'email',
+      solAddress: identity.agentWallet.solAddress ?? undefined,
+      step: 'authenticated',
+    },
+    identity,
+  )
 }
 
 function getCurrentIdentity() {
