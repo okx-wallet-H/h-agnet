@@ -371,7 +371,9 @@ function syncStrategyRunAfterAuthorization(card, authorizationGrant) {
     return null
   }
 
-  const run = strategySkillRepository.findRunById(runId)
+  const run = strategySkillRepository.findRunById(runId, {
+    userId: card.userId ?? getCurrentUserId(),
+  })
 
   if (!run) {
     return null
@@ -387,45 +389,49 @@ function syncStrategyRunAfterAuthorization(card, authorizationGrant) {
     ? `优先接入 ${blockedStep.wrapperId}。`
     : '等待 H Skill Runner 接入真实执行回执。'
 
-  return strategySkillRepository.updateRun(runId, (currentRun) => ({
-    ...currentRun,
-    authorization: {
-      ...currentRun.authorization,
-      authorizationGrantId:
-        authorizationGrant?.id ??
-        currentRun.authorization.authorizationGrantId ??
-        null,
-      authorizationStatus: 'agent-authorized',
-      executionMode: 'agent-authorized-pending-adapter',
-      policyReason: '策略授权已记录。',
-      requiredUserAuthorization: false,
-      safetyGate: 'agent-policy-authorized',
-    },
-    blockReason,
-    nextStep,
-    stateLabel: nextStateLabel,
-    status: nextStatus,
-    steps: currentRun.steps.map((step) => {
-      if (step.id === 'waiting-authorization') {
-        return {
-          ...step,
-          detail: '策略授权已记录。',
-          status: 'done',
+  return strategySkillRepository.updateRun(
+    runId,
+    (currentRun) => ({
+      ...currentRun,
+      authorization: {
+        ...currentRun.authorization,
+        authorizationGrantId:
+          authorizationGrant?.id ??
+          currentRun.authorization.authorizationGrantId ??
+          null,
+        authorizationStatus: 'agent-authorized',
+        executionMode: 'agent-authorized-pending-adapter',
+        policyReason: '策略授权已记录。',
+        requiredUserAuthorization: false,
+        safetyGate: 'agent-policy-authorized',
+      },
+      blockReason,
+      nextStep,
+      stateLabel: nextStateLabel,
+      status: nextStatus,
+      steps: currentRun.steps.map((step) => {
+        if (step.id === 'waiting-authorization') {
+          return {
+            ...step,
+            detail: '策略授权已记录。',
+            status: 'done',
+          }
         }
-      }
 
-      if (step.id === 'executing') {
-        return {
-          ...step,
-          detail: blockReason,
-          status: blockedStep ? 'blocked' : 'waiting',
+        if (step.id === 'executing') {
+          return {
+            ...step,
+            detail: blockReason,
+            status: blockedStep ? 'blocked' : 'waiting',
+          }
         }
-      }
 
-      return step
+        return step
+      }),
+      updatedAt: nowIso(),
     }),
-    updatedAt: nowIso(),
-  }))
+    { userId: card.userId ?? getCurrentUserId() },
+  )
 }
 
 function isOfficialStrategyCard(card) {

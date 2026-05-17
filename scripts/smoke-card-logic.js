@@ -50,6 +50,12 @@ const {
   getGrowthSummary,
   listSideQuests,
 } = require('../server/services/boostModuleService')
+const {
+  getAgentRunnerStatus,
+  listStrategyRuns,
+  runOfficialStrategyPreflight,
+  startOfficialStrategySkill,
+} = require('../server/services/strategySkillService')
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
@@ -65,6 +71,7 @@ async function main() {
   const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
   const executionAuthBoundary = smokeExecutionAuthBoundary()
   const cardLibraryGrowthBoundary = await smokeCardLibraryGrowthBoundary()
+  const strategyRunOwnershipBoundary = await smokeStrategyRunOwnershipBoundary()
 
   console.log(
     JSON.stringify(
@@ -81,6 +88,7 @@ async function main() {
         executionAuthBoundary,
         executionHandoff,
         hSkillRuntimeBoundary,
+        strategyRunOwnershipBoundary,
         verificationBoundary,
         verificationOwnershipBoundary,
       },
@@ -682,6 +690,57 @@ function smokeExecutionAuthBoundary() {
   }
 }
 
+async function smokeStrategyRunOwnershipBoundary() {
+  resetMemoryState()
+
+  const firstUser = userRepository.upsertByEmail(
+    'runner-owner-a@h-wallet.local',
+    { displayName: 'Runner A', status: 'active' },
+  )
+  const secondUser = userRepository.upsertByEmail(
+    'runner-owner-b@h-wallet.local',
+    { displayName: 'Runner B', status: 'active' },
+  )
+
+  userRepository.setCurrentUserId(firstUser.id)
+  const firstLaunch = startOfficialStrategySkill({
+    strategyId: 'official-stable-earn',
+  })
+
+  userRepository.setCurrentUserId(secondUser.id)
+  const secondLaunch = startOfficialStrategySkill({
+    strategyId: 'official-smart-rebalance',
+  })
+
+  const secondUserRuns = listStrategyRuns()
+  const secondRunner = getAgentRunnerStatus()
+
+  assert.equal(secondUserRuns.length, 1)
+  assert.equal(secondUserRuns[0].id, secondLaunch.run.id)
+  assert.equal(secondRunner.currentRun.id, secondLaunch.run.id)
+  assert.equal(
+    secondUserRuns.some((run) => run.id === firstLaunch.run.id),
+    false,
+  )
+
+  await assert.rejects(
+    () => runOfficialStrategyPreflight({ runId: firstLaunch.run.id }),
+    (error) => error.code === 'strategy-run-not-found',
+  )
+
+  userRepository.setCurrentUserId(firstUser.id)
+  const firstUserRuns = listStrategyRuns()
+
+  assert.equal(firstUserRuns.length, 1)
+  assert.equal(firstUserRuns[0].id, firstLaunch.run.id)
+
+  return {
+    blockedCrossUserPreflight: true,
+    firstUserRuns: firstUserRuns.length,
+    secondUserRuns: secondUserRuns.length,
+  }
+}
+
 async function smokeCardLibraryGrowthBoundary() {
   resetMemoryState()
 
@@ -838,6 +897,7 @@ function resetMemoryState() {
   cardRepository.hydrate([])
   agentConversationRepository.hydrate([], [])
   agentAuthorizationPolicyRepository.hydrate([])
+  strategySkillRepository.hydrateRuns([])
   strategySkillRepository.hydrateHSkillInvocations([])
   userRepository.hydrate([], null)
 

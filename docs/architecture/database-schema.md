@@ -83,7 +83,8 @@ must create a new authorization requirement.
 
 Stores Agent Runner state for official strategy runs, including authorization
 state, execution plan, H Skill composition, blocked adapter reason, and current
-timeline.
+timeline. Strategy runs are user-scoped: list, current-run, authorization sync,
+and preflight access must only return runs for the active H Wallet user.
 
 ### h_skill_invocations
 

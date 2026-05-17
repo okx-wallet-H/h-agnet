@@ -212,14 +212,18 @@ const strategySkillRepository = {
     return clone(run)
   },
 
-  findRunById(runId) {
-    const run = strategyRuns.find((item) => item.id === runId)
+  findRunById(runId, filter = {}) {
+    const run = strategyRuns.find(
+      (item) => item.id === runId && matchesRunFilter(item, filter),
+    )
 
     return run ? clone(run) : null
   },
 
-  updateRun(runId, updater) {
-    const runIndex = strategyRuns.findIndex((item) => item.id === runId)
+  updateRun(runId, updater, filter = {}) {
+    const runIndex = strategyRuns.findIndex(
+      (item) => item.id === runId && matchesRunFilter(item, filter),
+    )
 
     if (runIndex < 0) {
       return null
@@ -237,8 +241,8 @@ const strategySkillRepository = {
     return clone(strategyRuns[runIndex])
   },
 
-  listRuns() {
-    return strategyRuns.map(clone)
+  listRuns(filter = {}) {
+    return strategyRuns.filter((run) => matchesRunFilter(run, filter)).map(clone)
   },
 
   hydrateRuns(runs = []) {
@@ -267,6 +271,14 @@ const strategySkillRepository = {
 
 function clone(input) {
   return JSON.parse(JSON.stringify(input))
+}
+
+function matchesRunFilter(run, filter = {}) {
+  if (!Object.prototype.hasOwnProperty.call(filter, 'userId')) {
+    return true
+  }
+
+  return (run.userId ?? null) === (filter.userId ?? null)
 }
 
 module.exports = {

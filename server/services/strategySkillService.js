@@ -1,3 +1,5 @@
+const { randomUUID } = require('node:crypto')
+
 const {
   strategySkillRepository,
 } = require('../repositories/strategySkillRepository')
@@ -9,6 +11,7 @@ const {
 } = require('./agentAuthorizationPolicyService')
 const { createCard } = require('./cardsService')
 const { invokeHSkill } = require('./hSkillRuntimeService')
+const { getCurrentUserId } = require('./userIdentityService')
 
 const runnerStates = [
   {
@@ -68,7 +71,7 @@ function listHSkillWrappers() {
 }
 
 function listStrategyRuns() {
-  return strategySkillRepository.listRuns()
+  return strategySkillRepository.listRuns({ userId: getCurrentUserId() })
 }
 
 function getOfficialStrategyPlan(input) {
@@ -101,7 +104,7 @@ function getOfficialStrategyPlan(input) {
 }
 
 function getAgentRunnerStatus() {
-  const runs = strategySkillRepository.listRuns()
+  const runs = strategySkillRepository.listRuns({ userId: getCurrentUserId() })
   const currentRun = selectCurrentStrategyRun(runs)
 
   return {
@@ -153,6 +156,7 @@ function getRunDisplayPriority(status) {
 
 function startOfficialStrategySkill(input) {
   const strategyId = validateStrategyId(input?.strategyId)
+  const userId = getCurrentUserId()
   const strategy = enrichStrategyWithOkxSkillComposition(
     strategySkillRepository.findStrategyById(strategyId),
   )
@@ -179,9 +183,10 @@ function startOfficialStrategySkill(input) {
       ? 'blocked'
       : 'planning'
   const run = {
-    id: `agent-run-${Date.now()}`,
+    id: createStrategyRunId(),
     strategyId: strategy.id,
     strategyVersion: strategy.version,
+    userId,
     status: runStatus,
     createdAt: new Date().toISOString(),
     executionMode: 'draft-only',
@@ -296,9 +301,15 @@ function startOfficialStrategySkill(input) {
   }
 }
 
+function createStrategyRunId() {
+  return `agent-run-${Date.now()}-${randomUUID()}`
+}
+
 async function runOfficialStrategyPreflight(input) {
   const runId = validateStrategyId(input?.runId)
-  const run = strategySkillRepository.findRunById(runId)
+  const run = strategySkillRepository.findRunById(runId, {
+    userId: getCurrentUserId(),
+  })
 
   if (!run) {
     const error = new Error('策略运行记录不存在。')
