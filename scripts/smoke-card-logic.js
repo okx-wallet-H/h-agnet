@@ -61,7 +61,7 @@ async function main() {
   const verificationBoundary = await smokeVerificationBoundary()
   const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
   const executionAuthBoundary = smokeExecutionAuthBoundary()
-  const cardLibraryGrowthBoundary = smokeCardLibraryGrowthBoundary()
+  const cardLibraryGrowthBoundary = await smokeCardLibraryGrowthBoundary()
 
   console.log(
     JSON.stringify(
@@ -574,7 +574,7 @@ function smokeExecutionAuthBoundary() {
   }
 }
 
-function smokeCardLibraryGrowthBoundary() {
+async function smokeCardLibraryGrowthBoundary() {
   resetMemoryState()
 
   createCard({
@@ -667,8 +667,24 @@ function smokeCardLibraryGrowthBoundary() {
   assert.equal(verifiedQuest.requirement.current, 1)
   assert.equal(verifiedQuest.status, 'unlocked')
 
+  const boostTurn = await sendAgentConversationMessage({
+    content: '看看我的支线任务和会员成长',
+  })
+  const boostCard = boostTurn.cards.find((card) => card.type === 'side-quest')
+
+  assert.equal(boostTurn.intent, 'boost-action')
+  assert.equal(boostTurn.processSteps[0].id, 'read-card-library')
+  assert.equal(boostCard.metadata.cardLibrary.totalCards, 2)
+  assert.equal(boostCard.metadata.cardLibrary.completedTrades, 1)
+  assert.equal(boostCard.metadata.cardLibrary.pendingExecution, 1)
+  assert.equal(boostCard.metadata.nextQuest.id, 'trade-master')
+  assert.equal(boostCard.metadata.nextQuest.status, 'active')
+  assert.equal(boostCard.metadata.growth.score, growth.score)
+  assert.equal(listCards().length, 2)
+
   return {
     cardLibraryCards: stats.totalCards,
+    conversationBoostCardUsesCardLibrary: true,
     completedTrades: stats.completedTrades,
     growthScore: growth.score,
     ignoredNonTradeCards: true,

@@ -47,6 +47,8 @@ async function executeAgentCommand(input, dependencies) {
   const commandResult = await handler({
     content,
     createCard: dependencies.createCard,
+    getGrowthSummary: dependencies.getGrowthSummary,
+    listSideQuests: dependencies.listSideQuests,
     prepareSwap: dependencies.prepareSwap,
     runStrategyPreflight: dependencies.runStrategyPreflight,
     startOfficialStrategy: dependencies.startOfficialStrategy,
@@ -175,6 +177,29 @@ function detectIntent(content) {
 }
 
 function buildProcessSteps(intent, commandResult, authorization) {
+  if (intent === 'boost-action') {
+    return [
+      {
+        id: 'read-card-library',
+        title: '读取卡库',
+        detail: '只读取交易中和交易成功卡，不读取普通对话草稿。',
+        status: 'done',
+      },
+      {
+        id: 'score-growth',
+        title: '计算成长',
+        detail: '按当前已发布的支线任务和评分规则计算。',
+        status: 'done',
+      },
+      {
+        id: 'card',
+        title: '生成支线任务卡',
+        detail: '这张卡只展示进度，不触发钱包、交易或奖励领取。',
+        status: 'done',
+      },
+    ]
+  }
+
   if (intent === 'unknown') {
     return [
       {

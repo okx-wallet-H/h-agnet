@@ -12,6 +12,10 @@ const {
   runOfficialStrategyPreflight,
   startOfficialStrategySkill,
 } = require('./strategySkillService')
+const {
+  getGrowthSummary,
+  listSideQuests,
+} = require('./boostModuleService')
 
 function nowIso() {
   return new Date().toISOString()
@@ -33,6 +37,8 @@ function createMessage(role, content) {
 async function sendAgentConversationMessage(input) {
   const commandResult = await executeAgentCommand(input, {
     createCard,
+    getGrowthSummary,
+    listSideQuests,
     prepareSwap: prepareSwapPipeline,
     runStrategyPreflight: runOfficialStrategyPreflight,
     startOfficialStrategy: startOfficialStrategySkill,

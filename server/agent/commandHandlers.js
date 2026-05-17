@@ -134,33 +134,138 @@ function createWalletCommand({ content, createCard }) {
   }
 }
 
-function createBoostCommand({ createCard }) {
+function createBoostCommand({ createCard, getGrowthSummary, listSideQuests }) {
+  const growth =
+    typeof getGrowthSummary === 'function' ? getGrowthSummary() : null
+  const sideQuests =
+    typeof listSideQuests === 'function' ? listSideQuests() : []
+  const stats = growth?.stats ?? {}
+  const nextQuest = getNextSideQuest(sideQuests)
+  const unlockedCount = sideQuests.filter(
+    (quest) => quest.status === 'unlocked',
+  ).length
+  const totalCards = Number(stats.totalCards ?? 0)
+  const completedTrades = Number(stats.completedTrades ?? 0)
+  const pendingExecution = Number(stats.confirmations?.pendingExecution ?? 0)
+  const score = typeof growth?.score === 'number' ? growth.score : null
+  const tierLabel = growth?.tier?.label ?? '待激活'
+  const recommendedAction = growth?.recommendedActions?.[0]
+
   const card = createCard({
     type: 'side-quest',
     status: 'draft',
     source: 'ai-agent',
-    title: '赚币任务卡已准备好',
-    summary:
-      '我已记录你的赚币目标。后续任务、等级和奖励会根据卡库里的真实记录来计算。',
+    title: '支线任务进度',
+    summary: getBoostSummaryCopy({
+      completedTrades,
+      nextQuest,
+      pendingExecution,
+      totalCards,
+    }),
     metrics: [
       { label: '评分来源', value: '卡库', tone: 'gold' },
-      { label: '当前状态', value: '待整理', tone: 'muted' },
-      { label: '奖励领取', value: '需本人授权', tone: 'danger' },
+      { label: '会员等级', value: tierLabel, tone: score ? 'gold' : 'muted' },
+      {
+        label: '成长评分',
+        value: score === null ? '待计算' : `${score}/100`,
+        tone: score ? 'gold' : 'muted',
+      },
+      { label: '交易卡库', value: `${totalCards} 张`, tone: totalCards ? 'gold' : 'muted' },
+      { label: '交易中', value: `${pendingExecution} 张`, tone: pendingExecution ? 'gold' : 'muted' },
+      { label: '交易成功', value: `${completedTrades} 张`, tone: completedTrades ? 'success' : 'muted' },
+      {
+        label: '下一支线',
+        value: nextQuest?.title ?? recommendedAction?.title ?? '启动第一笔 Agent 交易',
+        tone: nextQuest?.status === 'unlocked' ? 'success' : 'gold',
+      },
     ],
+    metadata: {
+      cardLibrary: {
+        completedTrades,
+        pendingExecution,
+        totalCards,
+      },
+      growth: growth
+        ? {
+            score: growth.score,
+            taskScore: growth.taskScore,
+            tier: growth.tier,
+            trustScore: growth.trustScore,
+            verifiedResultScore: growth.verifiedResultScore,
+          }
+        : null,
+      nextAction: recommendedAction ?? null,
+      nextQuest: nextQuest
+        ? {
+            id: nextQuest.id,
+            progress: nextQuest.progress,
+            requirement: nextQuest.requirement,
+            status: nextQuest.status,
+            title: nextQuest.title,
+          }
+        : null,
+      unlockedQuestCount: unlockedCount,
+    },
     tags: ['conversation', 'boost', 'quest'],
   })
 
   return {
-    actionLabel: '赚币任务',
+    actionLabel: '支线任务',
     adapterRequirement: 'boost-service',
     authorizationRequest: {
       requiresAssetAction: false,
       scope: 'none',
     },
-    assistantText: '我已经把赚币目标整理成任务卡。后续会按卡库记录来计算等级和奖励。',
+    assistantText: getBoostAssistantCopy({
+      completedTrades,
+      nextQuest,
+      pendingExecution,
+      score,
+      tierLabel,
+      totalCards,
+    }),
     cards: [card],
-    requiredConfirmation: true,
+    requiredConfirmation: false,
   }
+}
+
+function getNextSideQuest(sideQuests) {
+  return (
+    sideQuests.find((quest) => quest.status === 'active') ??
+    sideQuests.find((quest) => quest.status === 'locked') ??
+    sideQuests.find((quest) => quest.status === 'unlocked') ??
+    null
+  )
+}
+
+function getBoostSummaryCopy({
+  completedTrades,
+  nextQuest,
+  pendingExecution,
+  totalCards,
+}) {
+  if (totalCards === 0) {
+    return '卡库还没有交易中或交易成功卡。先启动一次 Agent 赚币流程，支线任务和会员成长就会开始计分。'
+  }
+
+  return `卡库当前有 ${totalCards} 张交易卡，其中 ${pendingExecution} 张交易中、${completedTrades} 张交易成功。下一步关注「${nextQuest?.title ?? '继续积累交易卡'}」。`
+}
+
+function getBoostAssistantCopy({
+  completedTrades,
+  nextQuest,
+  pendingExecution,
+  score,
+  tierLabel,
+  totalCards,
+}) {
+  if (totalCards === 0) {
+    return '我看了一下卡库：现在还没有交易中或交易成功卡。先启动 Agent 赚币，卡库有记录后，支线任务和会员等级会自动开始计算。'
+  }
+
+  const scoreCopy = score === null ? '待计算' : `${score}/100`
+
+  return `我按卡库重新算了一遍：当前 ${tierLabel}，成长评分 ${scoreCopy}；交易中 ${pendingExecution} 张，交易成功 ${completedTrades} 张。下一支线是「${nextQuest?.title ?? '继续积累交易卡'}」。`
 }
 
 async function createEarningAgentCommand({
