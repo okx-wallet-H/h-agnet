@@ -200,6 +200,29 @@ function buildProcessSteps(intent, commandResult, authorization) {
     ]
   }
 
+  if (intent === 'portfolio-question') {
+    return [
+      {
+        id: 'read-card-library',
+        title: '读取卡库',
+        detail: '只读取交易中和交易成功卡，作为组合建议的行为依据。',
+        status: 'done',
+      },
+      {
+        id: 'portfolio-observation',
+        title: '生成组合观察',
+        detail: '当前只基于卡库行为给出建议，不伪造钱包持仓或收益。',
+        status: 'done',
+      },
+      {
+        id: 'card',
+        title: '生成组合观察卡',
+        detail: '这张卡不触发钱包、交易或授权动作。',
+        status: 'done',
+      },
+    ]
+  }
+
   if (intent === 'unknown') {
     return [
       {

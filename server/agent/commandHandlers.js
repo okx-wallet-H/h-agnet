@@ -387,19 +387,61 @@ function extractLikelyTokenSymbol(content) {
   return matches.find((item) => !ignored.has(item.toUpperCase())) ?? ''
 }
 
-function createPortfolioCommand({ createCard }) {
+function createPortfolioCommand({ createCard, getGrowthSummary }) {
+  const growth =
+    typeof getGrowthSummary === 'function' ? getGrowthSummary() : null
+  const stats = growth?.stats ?? {}
+  const totalCards = Number(stats.totalCards ?? 0)
+  const completedTrades = Number(stats.completedTrades ?? 0)
+  const pendingExecution = Number(stats.confirmations?.pendingExecution ?? 0)
+  const score = typeof growth?.score === 'number' ? growth.score : null
+  const tierLabel = growth?.tier?.label ?? '待激活'
+  const advice = getPortfolioAdvice({
+    completedTrades,
+    pendingExecution,
+    totalCards,
+  })
   const card = createCard({
     type: 'portfolio-insight',
     status: 'draft',
     source: 'ai-agent',
-    title: '资产分析卡已准备好',
-    summary:
-      '我已把资产问题整理成分析卡。真正的个性化建议会基于钱包资产和卡库历史。',
+    title: '组合观察卡',
+    summary: getPortfolioSummaryCopy({
+      advice,
+      completedTrades,
+      pendingExecution,
+      totalCards,
+    }),
     metrics: [
-      { label: '分析依据', value: '卡库+资产', tone: 'gold' },
-      { label: '当前状态', value: '待分析', tone: 'gold' },
+      { label: '分析依据', value: '卡库交易记录', tone: 'gold' },
+      { label: '会员等级', value: tierLabel, tone: score ? 'gold' : 'muted' },
+      {
+        label: '成长评分',
+        value: score === null ? '待计算' : `${score}/100`,
+        tone: score ? 'gold' : 'muted',
+      },
+      { label: '交易卡库', value: `${totalCards} 张`, tone: totalCards ? 'gold' : 'muted' },
+      { label: '交易中', value: `${pendingExecution} 张`, tone: pendingExecution ? 'gold' : 'muted' },
+      { label: '交易成功', value: `${completedTrades} 张`, tone: completedTrades ? 'success' : 'muted' },
+      { label: '当前建议', value: advice.label, tone: advice.tone },
       { label: '建议性质', value: '参考', tone: 'muted' },
     ],
+    metadata: {
+      cardLibrary: {
+        completedTrades,
+        pendingExecution,
+        totalCards,
+      },
+      growth: growth
+        ? {
+            score: growth.score,
+            tier: growth.tier,
+            trustScore: growth.trustScore,
+            verifiedResultScore: growth.verifiedResultScore,
+          }
+        : null,
+      portfolioAdvice: advice,
+    },
     tags: ['conversation', 'portfolio', 'insight'],
   })
 
@@ -410,10 +452,87 @@ function createPortfolioCommand({ createCard }) {
       requiresAssetAction: false,
       scope: 'none',
     },
-    assistantText: '我已经把资产问题整理成分析卡。等资产和卡库数据接好后，会给你更具体的建议。',
+    assistantText: getPortfolioAssistantCopy({
+      advice,
+      completedTrades,
+      pendingExecution,
+      score,
+      tierLabel,
+      totalCards,
+    }),
     cards: [card],
-    requiredConfirmation: true,
+    requiredConfirmation: false,
   }
+}
+
+function getPortfolioAdvice({ completedTrades, pendingExecution, totalCards }) {
+  if (totalCards === 0) {
+    return {
+      id: 'start-card-library',
+      label: '先建立卡库',
+      tone: 'gold',
+      detail:
+        '目前没有交易中或交易成功卡，先启动一次 Agent 赚币流程，再做组合判断会更可靠。',
+    }
+  }
+
+  if (completedTrades === 0 && pendingExecution > 0) {
+    return {
+      id: 'wait-verification',
+      label: '等待验证',
+      tone: 'gold',
+      detail:
+        '已有交易进入执行通道，但还没有验证成功记录。先等待 OKX / OnchainOS 回执，再调整组合。',
+    }
+  }
+
+  if (completedTrades > 0 && pendingExecution > completedTrades) {
+    return {
+      id: 'reduce-new-actions',
+      label: '降低新增动作',
+      tone: 'gold',
+      detail:
+        '交易中数量高于成功记录，建议先观察执行回执，避免连续追加复杂动作。',
+    }
+  }
+
+  return {
+    id: 'keep-small-steps',
+    label: '小步复利',
+    tone: 'success',
+    detail:
+      '卡库已有成功记录，可以继续用小额、低频、可验证的方式积累组合数据。',
+  }
+}
+
+function getPortfolioSummaryCopy({
+  advice,
+  completedTrades,
+  pendingExecution,
+  totalCards,
+}) {
+  if (totalCards === 0) {
+    return advice.detail
+  }
+
+  return `我按卡库记录做了组合观察：当前 ${totalCards} 张交易卡，${pendingExecution} 张交易中，${completedTrades} 张交易成功。建议：${advice.detail}`
+}
+
+function getPortfolioAssistantCopy({
+  advice,
+  completedTrades,
+  pendingExecution,
+  score,
+  tierLabel,
+  totalCards,
+}) {
+  if (totalCards === 0) {
+    return '我看了卡库：现在还没有交易中或交易成功卡，所以不能假装给出精确组合建议。先启动一次 Agent 赚币，卡库有记录后我再帮你分析。'
+  }
+
+  const scoreCopy = score === null ? '待计算' : `${score}/100`
+
+  return `我基于卡库做了组合观察：当前 ${tierLabel}，成长评分 ${scoreCopy}；交易中 ${pendingExecution} 张，交易成功 ${completedTrades} 张。我的建议是：${advice.detail}`
 }
 
 function createUnknownCommand({ createCard }) {

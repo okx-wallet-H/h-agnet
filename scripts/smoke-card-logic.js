@@ -690,11 +690,35 @@ async function smokeCardLibraryGrowthBoundary() {
     () => confirmCardReview(boostCard.id),
     (error) => error.code === 'authorization-not-required',
   )
+
+  const portfolioTurn = await sendAgentConversationMessage({
+    content: '帮我分析一下资产组合风险',
+  })
+  const portfolioCard = portfolioTurn.cards.find(
+    (card) => card.type === 'portfolio-insight',
+  )
+
+  assert.equal(portfolioTurn.intent, 'portfolio-question')
+  assert.equal(portfolioTurn.processSteps[0].id, 'read-card-library')
+  assert.equal(portfolioCard.metadata.cardLibrary.totalCards, 2)
+  assert.equal(portfolioCard.metadata.cardLibrary.completedTrades, 1)
+  assert.equal(portfolioCard.metadata.cardLibrary.pendingExecution, 1)
+  assert.equal(portfolioCard.metadata.growth.score, growth.score)
+  assert.equal(portfolioCard.metadata.portfolioAdvice.id, 'keep-small-steps')
+  assert.throws(
+    () => prepareCardForConfirmation(portfolioCard.id),
+    (error) => error.code === 'authorization-not-required',
+  )
+  assert.throws(
+    () => confirmCardReview(portfolioCard.id),
+    (error) => error.code === 'authorization-not-required',
+  )
   assert.equal(listCards().length, 2)
 
   return {
     cardLibraryCards: stats.totalCards,
     conversationBoostCardUsesCardLibrary: true,
+    conversationPortfolioCardUsesCardLibrary: true,
     completedTrades: stats.completedTrades,
     growthScore: growth.score,
     ignoredNonTradeCards: true,
