@@ -44,6 +44,10 @@ const {
   getHSkillRuntimeStatus,
 } = require('../server/services/hSkillRuntimeService')
 const { requireExecutionRequest } = require('../server/http/executionAuth')
+const {
+  getGrowthSummary,
+  listSideQuests,
+} = require('../server/services/boostModuleService')
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
@@ -57,6 +61,7 @@ async function main() {
   const verificationBoundary = await smokeVerificationBoundary()
   const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
   const executionAuthBoundary = smokeExecutionAuthBoundary()
+  const cardLibraryGrowthBoundary = smokeCardLibraryGrowthBoundary()
 
   console.log(
     JSON.stringify(
@@ -65,6 +70,7 @@ async function main() {
         authorizedBlockedPipeline,
         anonymousReadBoundary,
         cardOwnershipBoundary,
+        cardLibraryGrowthBoundary,
         clientCardBoundary,
         conversationBoundary,
         conversationOwnershipBoundary,
@@ -565,6 +571,110 @@ function smokeExecutionAuthBoundary() {
     } else {
       process.env.H_WALLET_EXECUTION_TOKEN = originalToken
     }
+  }
+}
+
+function smokeCardLibraryGrowthBoundary() {
+  resetMemoryState()
+
+  createCard({
+    type: 'wallet-created',
+    status: 'completed',
+    source: 'wallet-service',
+    title: '钱包创建记录',
+    summary: '钱包记录不能进入交易卡库评分。',
+    metrics: [{ label: '钱包状态', value: '已登录', tone: 'success' }],
+    metadata: {},
+    tags: ['wallet', 'agent-wallet'],
+  })
+  createCard({
+    type: 'portfolio-insight',
+    status: 'draft',
+    source: 'ai-agent',
+    title: '组合建议草稿',
+    summary: '组合建议不能作为交易卡库输入。',
+    metrics: [{ label: '建议', value: '观察', tone: 'muted' }],
+    metadata: {},
+    tags: ['conversation', 'portfolio'],
+  })
+  createCard({
+    type: 'side-quest',
+    status: 'draft',
+    source: 'boost-service',
+    title: '支线任务提示',
+    summary: '支线任务卡不能反向污染支线任务评分。',
+    metrics: [{ label: '任务', value: '观察', tone: 'gold' }],
+    metadata: {},
+    tags: ['conversation', 'boost', 'quest'],
+  })
+  createTradeConfirmationCard({
+    status: 'confirmed',
+    title: '已授权但未执行交易',
+  })
+  createCard({
+    type: 'execution-receipt',
+    status: 'confirmed',
+    source: 'okx-onchainos',
+    title: '授权回执',
+    summary: '授权回执不是交易卡库记录。',
+    metrics: [{ label: '执行状态', value: '未广播', tone: 'danger' }],
+    metadata: {},
+    tags: ['receipt', 'execution'],
+  })
+  createTradeConfirmationCard({
+    status: 'pending-execution',
+    title: '交易中卡',
+    metadata: {
+      pipeline: {
+        intent: {
+          chain: 'ethereum',
+          fromToken: 'ETH',
+          toToken: 'USDC',
+        },
+        stage: 'prepared',
+      },
+    },
+    tags: ['conversation', 'trading', 'swap-data', 'simulation'],
+  })
+  createCard({
+    type: 'trade-success',
+    status: 'completed',
+    source: 'okx-onchainos',
+    title: '交易成功卡',
+    summary: '只有真实验证成功的交易结果才能进入成功统计。',
+    metrics: [{ label: '当前状态', value: '交易成功', tone: 'success' }],
+    metadata: { txHash: '0xverified-card-library-growth' },
+    tags: ['conversation', 'trading', 'verified-result'],
+  })
+
+  const stats = getCardLibraryStats()
+  const growth = getGrowthSummary()
+  const sideQuests = listSideQuests()
+  const tradeMasterQuest = sideQuests.find((quest) => quest.id === 'trade-master')
+  const verifiedQuest = sideQuests.find((quest) => quest.id === 'verified-record')
+
+  assert.equal(stats.totalCards, 2)
+  assert.equal(stats.activity.tradeCards, 2)
+  assert.equal(stats.completedTrades, 1)
+  assert.equal(stats.confirmations.pendingExecution, 1)
+  assert.equal(stats.walletActions, 0)
+  assert.equal(stats.portfolioInsights, 0)
+  assert.equal(growth.source, 'card-library')
+  assert.equal(growth.stats.totalCards, 2)
+  assert.equal(growth.score, stats.membershipScore)
+  assert.equal(tradeMasterQuest.requirement.current, 2)
+  assert.equal(tradeMasterQuest.status, 'active')
+  assert.equal(verifiedQuest.requirement.current, 1)
+  assert.equal(verifiedQuest.status, 'unlocked')
+
+  return {
+    cardLibraryCards: stats.totalCards,
+    completedTrades: stats.completedTrades,
+    growthScore: growth.score,
+    ignoredNonTradeCards: true,
+    pendingExecution: stats.confirmations.pendingExecution,
+    tradeMasterStatus: tradeMasterQuest.status,
+    verifiedQuestStatus: verifiedQuest.status,
   }
 }
 
