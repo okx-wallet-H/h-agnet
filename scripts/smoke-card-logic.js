@@ -620,18 +620,16 @@ function smokeHSkillRuntimeBoundary() {
   const serializedStatus = JSON.stringify(status)
 
   assert.equal(status.invocationCount, 1)
-  assert.equal(
-    status.lastInvocation.id,
-    'h-skill-invocation-sensitive-smoke',
-  )
-  assert.deepEqual(status.lastInvocation.inputKeys, ['walletAddress', 'reason'])
-  assert.equal(status.lastInvocation.result.code, 'quote-read')
+  assert.equal(status.lastInvocation, null)
   assert.equal(serializedStatus.includes('providerResponse'), false)
   assert.equal(serializedStatus.includes('sensitive provider payload'), false)
   assert.equal(serializedStatus.includes('0xsensitivewalletaddress'), false)
+  assert.equal(serializedStatus.includes('walletAddress'), false)
+  assert.equal(serializedStatus.includes('quote-read'), false)
 
   return {
     invocationCount: status.invocationCount,
+    lastInvocationHidden: true,
     rawProviderPayloadHidden: true,
     rawInputValuesHidden: true,
   }

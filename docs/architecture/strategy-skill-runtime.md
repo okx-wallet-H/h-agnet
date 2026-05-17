@@ -119,7 +119,9 @@ GET  /api/h/v1/agent/skill-runtime/invocations
 
 `skill-runtime` is safe for the mobile client and returns only a sanitized
 runtime summary. It must not expose raw provider payloads, wallet responses, or
-full invocation inputs.
+full invocation inputs. It also must not expose the global last invocation
+summary; detailed invocation audit data stays behind the internal audit
+endpoint.
 
 `invoke` and `invocations` are internal runner/audit endpoints. They require the
 backend execution token (`H_WALLET_EXECUTION_TOKEN`) and must never be called
