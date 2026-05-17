@@ -132,11 +132,26 @@ function createTrackingInput(card, input) {
 function findExistingSuccessCard(card, txHash) {
   return cardRepository.findFirst(
     (candidate) =>
+      isSameCardOwner(candidate, card) &&
       candidate.type === 'trade-success' &&
       candidate.status === 'completed' &&
       (candidate.tags.includes(`parent:${card.id}`) ||
         candidate.tags.includes(`tx:${txHash}`)),
   )
+}
+
+function isSameCardOwner(candidate, parentCard) {
+  if (parentCard.userId) {
+    return candidate.userId === parentCard.userId
+  }
+
+  const currentUserId = getCurrentUserId()
+
+  if (currentUserId) {
+    return !candidate.userId || candidate.userId === currentUserId
+  }
+
+  return !candidate.userId
 }
 
 function createTradeSuccessCard({ card, tracking, trackingInput }) {
@@ -148,6 +163,7 @@ function createTradeSuccessCard({ card, tracking, trackingInput }) {
     type: 'trade-success',
     status: 'completed',
     source: 'okx-onchainos',
+    userId: card.userId ?? getCurrentUserId(),
     title: '交易成功',
     summary:
       'OKX DEX History 已验证这笔交易成功。H Wallet 已把结果写入交易卡库。',

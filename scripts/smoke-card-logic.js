@@ -61,6 +61,7 @@ async function main() {
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
   const verificationBoundary = await smokeVerificationBoundary()
+  const verificationOwnershipBoundary = await smokeVerificationOwnershipBoundary()
   const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
   const executionAuthBoundary = smokeExecutionAuthBoundary()
   const cardLibraryGrowthBoundary = await smokeCardLibraryGrowthBoundary()
@@ -81,6 +82,7 @@ async function main() {
         executionHandoff,
         hSkillRuntimeBoundary,
         verificationBoundary,
+        verificationOwnershipBoundary,
       },
       null,
       2,
@@ -478,6 +480,83 @@ async function smokeVerificationBoundary() {
   return {
     cardLibraryCards: listCards().length,
     rejectedMissingTxHash: true,
+  }
+}
+
+async function smokeVerificationOwnershipBoundary() {
+  const owner = resetMemoryState()
+  const pendingExecutionCard = createTradeConfirmationCard({
+    status: 'pending-execution',
+    title: 'Prepared trade with existing success',
+    metadata: {
+      pipeline: {
+        intent: {
+          chain: 'ethereum',
+          fromToken: 'ETH',
+          toToken: 'USDC',
+        },
+        stage: 'prepared',
+      },
+      txHash: '0x111122223333444455556666777788889999abcd',
+    },
+    tags: ['conversation', 'trading', 'swap-data', 'simulation'],
+  })
+  const ownerSuccessCard = createCard({
+    type: 'trade-success',
+    status: 'completed',
+    source: 'okx-onchainos',
+    title: 'Owner verified trade success',
+    summary: 'Owner verified by provider tracking.',
+    metrics: [{ label: 'Status', value: 'Success', tone: 'success' }],
+    metadata: {
+      txHash: '0x111122223333444455556666777788889999abcd',
+    },
+    tags: [
+      'conversation',
+      'trading',
+      'verified-result',
+      'tx:0x111122223333444455556666777788889999abcd',
+    ],
+  })
+
+  const otherUser = userRepository.upsertByEmail('smoke-other@h-wallet.local', {
+    displayName: 'Smoke Other User',
+    status: 'active',
+  })
+  userRepository.setCurrentUserId(otherUser.id)
+  const otherSuccessCard = createCard({
+    type: 'trade-success',
+    status: 'completed',
+    source: 'okx-onchainos',
+    title: 'Other verified trade success',
+    summary: 'Other user success with same tx hash must not be reused.',
+    metrics: [{ label: 'Status', value: 'Success', tone: 'success' }],
+    metadata: {
+      txHash: '0x111122223333444455556666777788889999abcd',
+    },
+    tags: [
+      'conversation',
+      'trading',
+      'verified-result',
+      'tx:0x111122223333444455556666777788889999abcd',
+    ],
+  })
+
+  userRepository.setCurrentUserId(owner.id)
+
+  const result = await verifyTradeResult(pendingExecutionCard.id, {
+    chain: 'ethereum',
+    txHash: '0x111122223333444455556666777788889999abcd',
+  })
+
+  assert.equal(result.status, 'success')
+  assert.equal(result.successCard.id, ownerSuccessCard.id)
+  assert.equal(result.successCard.userId, owner.id)
+  assert.notEqual(result.successCard.id, otherSuccessCard.id)
+
+  return {
+    ignoredCrossUserSuccessCard: true,
+    successCardUserId: result.successCard.userId,
   }
 }
 
