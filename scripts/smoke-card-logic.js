@@ -485,6 +485,10 @@ async function smokeVerificationBoundary() {
 
 async function smokeVerificationOwnershipBoundary() {
   const owner = resetMemoryState()
+  const turn = await sendAgentConversationMessage({
+    content: '记录这笔交易后续结果',
+  })
+  const parentConversationCard = turn.cards[0]
   const pendingExecutionCard = createTradeConfirmationCard({
     status: 'pending-execution',
     title: 'Prepared trade with existing success',
@@ -501,6 +505,8 @@ async function smokeVerificationOwnershipBoundary() {
     },
     tags: ['conversation', 'trading', 'swap-data', 'simulation'],
   })
+  attachCardToConversationTurn(parentConversationCard.id, pendingExecutionCard)
+
   const ownerSuccessCard = createCard({
     type: 'trade-success',
     status: 'completed',
@@ -554,7 +560,16 @@ async function smokeVerificationOwnershipBoundary() {
   assert.equal(result.successCard.userId, owner.id)
   assert.notEqual(result.successCard.id, otherSuccessCard.id)
 
+  const hydratedTurn = listAgentConversationTurns().find(
+    (item) => item.id === turn.id,
+  )
+  assert.ok(
+    hydratedTurn.cards.some((card) => card.id === pendingExecutionCard.id),
+  )
+  assert.ok(hydratedTurn.cards.some((card) => card.id === ownerSuccessCard.id))
+
   return {
+    attachedSuccessCardToConversation: true,
     ignoredCrossUserSuccessCard: true,
     successCardUserId: result.successCard.userId,
   }

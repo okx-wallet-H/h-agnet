@@ -1,4 +1,7 @@
 const { cardRepository } = require('../repositories/cardRepository')
+const {
+  attachCardToConversationTurn,
+} = require('./agentConversationService')
 const { createCard } = require('./cardsService')
 const { invokeHSkill } = require('./hSkillRuntimeService')
 const { getCurrentUserId } = require('./userIdentityService')
@@ -27,6 +30,8 @@ async function verifyTradeResult(cardId, input = {}) {
   const existingSuccessCard = findExistingSuccessCard(card, trackingInput.txHash)
 
   if (existingSuccessCard) {
+    attachCardToConversationTurn(card.id, existingSuccessCard)
+
     return {
       card,
       status: 'success',
@@ -57,6 +62,7 @@ async function verifyTradeResult(cardId, input = {}) {
       trackingInput,
     })
     markParentCompleted(card, trackingInput.txHash)
+    attachCardToConversationTurn(card.id, successCard)
 
     return {
       card,
