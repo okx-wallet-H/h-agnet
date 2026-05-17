@@ -36,7 +36,7 @@ H.agent.strategies     → GET /api/h/v1/agent/strategies
 H.agent.strategyPlan   → GET /api/h/v1/agent/strategies/:id/plan
 H.agent.skills         → GET /api/h/v1/agent/skill-wrappers
 H.agent.skillRuntime   → GET /api/h/v1/agent/skill-runtime
-H.agent.skillDryRun    → POST /api/h/v1/agent/skill-runtime/dry-run
+H.agent.skillDryRun    → POST /api/h/v1/agent/skill-runtime/dry-run (internal)
 H.agent.skillInvoke    → POST /api/h/v1/agent/skill-runtime/invoke (internal)
 H.agent.skillAudit     → GET /api/h/v1/agent/skill-runtime/invocations (internal)
 H.agent.runner         → GET /api/h/v1/agent/runner
@@ -62,11 +62,13 @@ H.admin.boost.scoring  → GET /api/h/v1/admin/boost/scoring-rules
 H.admin.audit.logs     → GET /api/h/v1/admin/audit-logs
 ```
 
-`H.agent.skillRuntime` and `H.agent.skillDryRun` may be exposed for product
-status and safe planning. `H.agent.skillInvoke` is internal-only and protected
-by `H_WALLET_EXECUTION_TOKEN`; the mobile app must not call wrapped OKX skills
-directly. User-facing execution must flow through AI conversation, authorization
-cards, strategy runner, execution handoff, and verified result cards.
+`H.agent.skillRuntime` may be exposed for product status, but it must stay
+sanitized. `H.agent.skillDryRun`, `H.agent.skillInvoke`, and
+`H.agent.skillAudit` are internal-only and protected by
+`H_WALLET_EXECUTION_TOKEN`; the mobile app must not call wrapped OKX skills or
+create H Skill invocation records directly. User-facing execution must flow
+through AI conversation, authorization cards, strategy runner, execution
+handoff, and verified result cards.
 
 `/integrations/okx/status` includes the OKX provider registry. It reports
 server-only adapter readiness for Onchain providers such as Agent Wallet, DEX

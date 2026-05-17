@@ -102,48 +102,6 @@ export type HSkillWrapper = {
   description: string
 }
 
-export type HSkillInvocation = {
-  id: string
-  wrapperId: string
-  providerSkill: string
-  status: 'blocked' | 'completed'
-  executionMode:
-    | 'dry-run-only'
-    | 'read-only-adapter'
-    | 'strategy-composition'
-    | 'transaction-build-adapter'
-  createdAt: string
-  inputSummary: Record<string, string>
-  result:
-    | {
-        ok: false
-        code: string
-        message: string
-        data?: unknown
-      }
-    | {
-        ok: true
-        code: string
-        message: string
-        data: unknown
-      }
-}
-
-export type HSkillInvocationSummary = {
-  id: string
-  wrapperId: string
-  providerSkill: string
-  status: HSkillInvocation['status']
-  executionMode: HSkillInvocation['executionMode']
-  createdAt: string
-  inputKeys: string[]
-  result: {
-    ok: boolean
-    code: string
-    message: string
-  }
-}
-
 export type HSkillRuntimeStatus = {
   status: 'contract-ready'
   realExecutionEnabled: boolean
@@ -161,16 +119,11 @@ export type HSkillRuntimeStatus = {
   }>
   wrapperCount: number
   invocationCount: number
-  lastInvocation: HSkillInvocationSummary | null
+  lastInvocation: null
   policy: {
     mode: 'dry-run-only' | 'read-preflight-only'
     reason: string
   }
-}
-
-export type HSkillDryRunResult = {
-  invocation: HSkillInvocation
-  wrapper: HSkillWrapper
 }
 
 export type OfficialStrategySkill = {

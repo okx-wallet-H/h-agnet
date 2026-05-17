@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { isApiConfigured } from '../../../services/api/httpClient'
 import {
-  dryRunHSkill,
   getAgentRunnerStatus,
   getHSkillRuntimeStatus,
   getOfficialStrategyPlan,
@@ -53,25 +52,6 @@ export function useHSkillRuntimeStatus() {
     queryKey: strategySkillKeys.runtime(),
     queryFn: getHSkillRuntimeStatus,
     enabled: isApiConfigured(),
-  })
-}
-
-export function useDryRunHSkill() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({
-      wrapperId,
-      input,
-    }: {
-      wrapperId: string
-      input?: Record<string, unknown>
-    }) => dryRunHSkill(wrapperId, input),
-    onSuccess() {
-      void queryClient.invalidateQueries({
-        queryKey: strategySkillKeys.runtime(),
-      })
-    },
   })
 }
 

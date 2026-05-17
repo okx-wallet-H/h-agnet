@@ -108,13 +108,14 @@ H.skill.swap.quote
 This keeps the Agent Runner stable when strategies change or when provider
 integrations are replaced.
 
-The first runtime contract is dry-run only:
+The first runtime contract keeps public status separate from internal
+execution/audit endpoints:
 
 ```txt
-GET  /api/h/v1/agent/skill-runtime
-POST /api/h/v1/agent/skill-runtime/dry-run
-POST /api/h/v1/agent/skill-runtime/invoke
-GET  /api/h/v1/agent/skill-runtime/invocations
+GET  /api/h/v1/agent/skill-runtime              public sanitized status
+POST /api/h/v1/agent/skill-runtime/dry-run      internal runner planning
+POST /api/h/v1/agent/skill-runtime/invoke       internal runner execution
+GET  /api/h/v1/agent/skill-runtime/invocations  internal audit
 ```
 
 `skill-runtime` is safe for the mobile client and returns only a sanitized
@@ -123,9 +124,11 @@ full invocation inputs. It also must not expose the global last invocation
 summary; detailed invocation audit data stays behind the internal audit
 endpoint.
 
-`invoke` and `invocations` are internal runner/audit endpoints. They require the
-backend execution token (`H_WALLET_EXECUTION_TOKEN`) and must never be called
-directly from the mobile frontend.
+`dry-run`, `invoke`, and `invocations` are internal runner/audit endpoints.
+They require the backend execution token (`H_WALLET_EXECUTION_TOKEN`) and must
+never be called directly from the mobile frontend. The mobile app should start
+strategy runs or submit conversation commands, then let the backend runner
+resolve H Skill wrappers.
 
 Dry-run validates wrapper identity, records an invocation, and returns a blocked
 result. It does not call OKX, OnchainOS, wallets, or provider APIs.

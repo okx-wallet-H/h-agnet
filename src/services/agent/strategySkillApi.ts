@@ -1,7 +1,6 @@
 import { apiRequest } from '../api/httpClient'
 import type {
   AgentRunnerStatus,
-  HSkillDryRunResult,
   HSkillRuntimeStatus,
   HSkillWrapper,
   OfficialStrategySkill,
@@ -18,10 +17,6 @@ export type StrategySkillApi = {
   ) => Promise<StrategyPlanResult>
   listHSkillWrappers: () => Promise<HSkillWrapper[]>
   getHSkillRuntimeStatus: () => Promise<HSkillRuntimeStatus>
-  dryRunHSkill: (
-    wrapperId: string,
-    input?: Record<string, unknown>,
-  ) => Promise<HSkillDryRunResult>
   getAgentRunnerStatus: () => Promise<AgentRunnerStatus>
   listStrategyRuns: () => Promise<StrategyRun[]>
   startOfficialStrategy: (
@@ -45,12 +40,6 @@ export const strategySkillApi: StrategySkillApi = {
   },
   getHSkillRuntimeStatus() {
     return apiRequest('/agent/skill-runtime')
-  },
-  dryRunHSkill(wrapperId, input = {}) {
-    return apiRequest('/agent/skill-runtime/dry-run', {
-      method: 'POST',
-      body: { wrapperId, input },
-    })
   },
   getAgentRunnerStatus() {
     return apiRequest('/agent/runner')

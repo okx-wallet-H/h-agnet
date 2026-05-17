@@ -245,6 +245,7 @@ async function handleRequest(request, response) {
       request.method === 'POST' &&
       routePath === '/agent/skill-runtime/dry-run'
     ) {
+      requireExecutionRequest(request)
       const body = await readJsonBody(request)
       sendJson(response, 200, {
         ok: true,

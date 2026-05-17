@@ -87,9 +87,9 @@ routes use the H Wallet namespace prefix: `/api/h/v1`.
 * `GET /api/h/v1/agent/strategies`
 * `GET /api/h/v1/agent/skill-wrappers`
 * `GET /api/h/v1/agent/skill-runtime`
-* `GET /api/h/v1/agent/skill-runtime/invocations`
-* `POST /api/h/v1/agent/skill-runtime/dry-run`
-* `POST /api/h/v1/agent/skill-runtime/invoke`
+* `GET /api/h/v1/agent/skill-runtime/invocations` internal
+* `POST /api/h/v1/agent/skill-runtime/dry-run` internal
+* `POST /api/h/v1/agent/skill-runtime/invoke` internal
 * `GET /api/h/v1/agent/runner`
 * `GET /api/h/v1/agent/runs`
 * `POST /api/h/v1/agent/strategies/:id/start`

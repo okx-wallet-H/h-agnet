@@ -16,13 +16,6 @@ export function getHSkillRuntimeStatus() {
   return strategySkillApi.getHSkillRuntimeStatus()
 }
 
-export function dryRunHSkill(
-  wrapperId: string,
-  input?: Record<string, unknown>,
-) {
-  return strategySkillApi.dryRunHSkill(wrapperId, input)
-}
-
 export function getAgentRunnerStatus() {
   return strategySkillApi.getAgentRunnerStatus()
 }
