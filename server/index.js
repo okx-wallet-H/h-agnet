@@ -97,6 +97,8 @@ const { getOkxIntegrationStatus } = require('./services/okxIntegrationService')
 const { requireAdminRequest } = require('./http/adminAuth')
 const { requireExecutionRequest } = require('./http/executionAuth')
 const { readJsonBody, sendJson } = require('./http/json')
+const { resolveRequestUserId } = require('./http/sessionAuth')
+const { runWithRequestUser } = require('./services/userIdentityService')
 
 const port = Number(process.env.PORT ?? 3000)
 const host = process.env.HOST ?? '127.0.0.1'
@@ -821,10 +823,16 @@ async function handleRequest(request, response) {
 }
 
 const server = http.createServer((request, response) => {
-  void handleRequest(request, response)
+  void handleHttpRequest(request, response)
 })
 
 void startServer()
+
+async function handleHttpRequest(request, response) {
+  const userId = resolveRequestUserId(request)
+
+  await runWithRequestUser(userId, () => handleRequest(request, response))
+}
 
 async function startServer() {
   try {

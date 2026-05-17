@@ -1,3 +1,5 @@
+import { getApiSessionToken } from './sessionTokenStore'
+
 export type ApiClientErrorCode =
   | 'missing-api-base-url'
   | 'request-failed'
@@ -49,9 +51,11 @@ export async function apiRequest<TResponse>(
     )
   }
 
+  const sessionToken = await getApiSessionToken()
   const response = await fetch(`${apiBaseUrl}${normalizeApiPath(path)}`, {
     method: options.method ?? 'GET',
     headers: {
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       'Content-Type': 'application/json',
     },
     body: options.body ? JSON.stringify(options.body) : undefined,

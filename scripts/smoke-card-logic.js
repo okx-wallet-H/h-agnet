@@ -7,6 +7,9 @@ const {
   agentAuthorizationPolicyRepository,
 } = require('../server/repositories/agentAuthorizationPolicyRepository')
 const {
+  authSessionRepository,
+} = require('../server/repositories/authSessionRepository')
+const {
   agentConversationRepository,
 } = require('../server/repositories/agentConversationRepository')
 const {
@@ -56,6 +59,11 @@ const {
   runOfficialStrategyPreflight,
   startOfficialStrategySkill,
 } = require('../server/services/strategySkillService')
+const {
+  getCurrentUserId,
+  getCurrentUserIdentity,
+  runWithRequestUser,
+} = require('../server/services/userIdentityService')
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
@@ -72,6 +80,7 @@ async function main() {
   const executionAuthBoundary = smokeExecutionAuthBoundary()
   const cardLibraryGrowthBoundary = await smokeCardLibraryGrowthBoundary()
   const strategyRunOwnershipBoundary = await smokeStrategyRunOwnershipBoundary()
+  const sessionContextBoundary = await smokeSessionContextBoundary()
 
   console.log(
     JSON.stringify(
@@ -88,6 +97,7 @@ async function main() {
         executionAuthBoundary,
         executionHandoff,
         hSkillRuntimeBoundary,
+        sessionContextBoundary,
         strategyRunOwnershipBoundary,
         verificationBoundary,
         verificationOwnershipBoundary,
@@ -741,6 +751,63 @@ async function smokeStrategyRunOwnershipBoundary() {
   }
 }
 
+async function smokeSessionContextBoundary() {
+  resetMemoryState()
+
+  const firstUser = userRepository.upsertByEmail(
+    'session-owner-a@h-wallet.local',
+    { displayName: 'Session A', status: 'active' },
+  )
+  const secondUser = userRepository.upsertByEmail(
+    'session-owner-b@h-wallet.local',
+    { displayName: 'Session B', status: 'active' },
+  )
+  const firstSession = authSessionRepository.createSession({
+    userId: firstUser.id,
+  })
+  const secondSession = authSessionRepository.createSession({
+    userId: secondUser.id,
+  })
+  const resolvedFirstSession = authSessionRepository.resolveSessionToken(
+    firstSession.token,
+  )
+  const resolvedSecondSession = authSessionRepository.resolveSessionToken(
+    secondSession.token,
+  )
+
+  assert.equal(resolvedFirstSession.userId, firstUser.id)
+  assert.equal(resolvedSecondSession.userId, secondUser.id)
+
+  await runWithRequestUser(resolvedFirstSession.userId, async () => {
+    assert.equal(getCurrentUserId(), firstUser.id)
+    assert.equal(getCurrentUserIdentity().user.id, firstUser.id)
+    createTradeConfirmationCard({
+      status: 'pending-execution',
+      tags: ['session-boundary', 'trade'],
+    })
+    assert.equal(listCards().length, 1)
+  })
+
+  await runWithRequestUser(resolvedSecondSession.userId, async () => {
+    assert.equal(getCurrentUserId(), secondUser.id)
+    assert.equal(getCurrentUserIdentity().user.id, secondUser.id)
+    assert.equal(listCards().length, 0)
+  })
+
+  await runWithRequestUser(null, async () => {
+    assert.equal(getCurrentUserId(), null)
+    assert.equal(getCurrentUserIdentity(), null)
+    assert.equal(listCards().length, 0)
+  })
+
+  return {
+    anonymousContextIsEmpty: true,
+    firstSessionResolved: true,
+    isolatedCardLibrary: true,
+    secondSessionResolved: true,
+  }
+}
+
 async function smokeCardLibraryGrowthBoundary() {
   resetMemoryState()
 
@@ -897,6 +964,7 @@ function resetMemoryState() {
   cardRepository.hydrate([])
   agentConversationRepository.hydrate([], [])
   agentAuthorizationPolicyRepository.hydrate([])
+  authSessionRepository.hydrate([])
   strategySkillRepository.hydrateRuns([])
   strategySkillRepository.hydrateHSkillInvocations([])
   userRepository.hydrate([], null)

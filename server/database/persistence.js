@@ -70,6 +70,36 @@ function persistCurrentUserId(userId) {
   })
 }
 
+function persistAuthSession(session) {
+  scheduleWrite(async () => {
+    await query(
+      `
+        insert into h_wallet_sessions (
+          id, user_id, token_hash, source, status, created_at, last_seen_at,
+          expires_at
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+        on conflict (id) do update set
+          user_id = excluded.user_id,
+          token_hash = excluded.token_hash,
+          source = excluded.source,
+          status = excluded.status,
+          last_seen_at = excluded.last_seen_at,
+          expires_at = excluded.expires_at
+      `,
+      [
+        session.id,
+        session.userId,
+        session.tokenHash,
+        session.source,
+        session.status,
+        session.createdAt,
+        session.lastSeenAt,
+        session.expiresAt,
+      ],
+    )
+  })
+}
+
 function persistAgentWallet(binding) {
   scheduleWrite(async () => {
     await query(
@@ -335,6 +365,7 @@ async function loadPersistedState() {
   const [
     users,
     runtimeState,
+    authSessions,
     agentWallets,
     cards,
     grants,
@@ -346,6 +377,7 @@ async function loadPersistedState() {
   ] = await Promise.all([
     query('select * from users order by created_at desc'),
     query("select value from h_runtime_state where key = 'currentUserId'"),
+    query('select * from h_wallet_sessions order by created_at desc'),
     query('select * from agent_wallets order by created_at desc'),
     query('select * from cards order by created_at desc'),
     query('select * from agent_authorization_grants order by created_at desc'),
@@ -358,6 +390,7 @@ async function loadPersistedState() {
 
   return {
     adminAuditLogs: adminAuditLogs.rows.map(mapAdminAuditLog),
+    authSessions: authSessions.rows.map(mapAuthSession),
     agentWallets: agentWallets.rows.map(mapAgentWallet),
     authorizationGrants: grants.rows.map(mapAuthorizationGrant),
     cards: cards.rows.map(mapCard),
@@ -384,6 +417,7 @@ function scheduleWrite(task) {
 function createEmptyState() {
   return {
     adminAuditLogs: [],
+    authSessions: [],
     agentWallets: [],
     authorizationGrants: [],
     cards: [],
@@ -393,6 +427,19 @@ function createEmptyState() {
     hSkillInvocations: [],
     strategyRuns: [],
     users: [],
+  }
+}
+
+function mapAuthSession(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    tokenHash: row.token_hash,
+    source: row.source,
+    status: row.status,
+    createdAt: toIso(row.created_at),
+    lastSeenAt: toIso(row.last_seen_at),
+    expiresAt: toIso(row.expires_at),
   }
 }
 
@@ -505,6 +552,7 @@ module.exports = {
   initializePostgresPersistence,
   loadPersistedState,
   persistAdminAuditLog,
+  persistAuthSession,
   persistAgentConversationMessage,
   persistAgentConversationTurn,
   persistAgentWallet,

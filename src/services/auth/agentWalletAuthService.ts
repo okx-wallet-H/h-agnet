@@ -1,5 +1,7 @@
 import { agentWalletAuthApi } from './agentWalletAuthApi'
+import { setApiSessionToken } from '../api/sessionTokenStore'
 import type {
+  AgentWalletAuthSession,
   RequestAgentWalletOtpInput,
   VerifyAgentWalletOtpInput,
 } from './types'
@@ -22,13 +24,15 @@ export function getAgentWalletRemoteStatus() {
 export async function requestAgentWalletOtp(
   input: RequestAgentWalletOtpInput,
 ) {
-  return agentWalletAuthApi.requestOtp(input)
+  return persistHWalletSession(await agentWalletAuthApi.requestOtp(input))
 }
 
 export async function verifyAgentWalletOtpAndCreateWallet(
   input: VerifyAgentWalletOtpInput,
 ) {
-  return agentWalletAuthApi.verifyOtpAndCreateWallet(input)
+  return persistHWalletSession(
+    await agentWalletAuthApi.verifyOtpAndCreateWallet(input),
+  )
 }
 
 export async function getAgentWalletSession() {
@@ -37,4 +41,12 @@ export async function getAgentWalletSession() {
 
 export async function getHWalletIdentity() {
   return agentWalletAuthApi.getIdentity()
+}
+
+async function persistHWalletSession(session: AgentWalletAuthSession) {
+  if (session.hWalletSession?.token) {
+    await setApiSessionToken(session.hWalletSession.token)
+  }
+
+  return session
 }

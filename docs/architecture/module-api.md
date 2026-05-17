@@ -99,6 +99,12 @@ do not replace the user's Agent Wallet authorization. Real asset actions still
 belong to the user's Agent Wallet permission scope, risk gate, and verified
 provider response.
 
+H Wallet app sessions are separate from OKX credentials. The backend issues a
+short opaque session token after email OTP request / verification, stores only
+its hash, and resolves `Authorization: Bearer <token>` into the active H Wallet
+user for cards, Agent Runner, growth, quests, and chat. The mobile app stores
+that token in secure storage; it must never store OKX project credentials.
+
 If a future CEX module is added, it must live under its own explicit slice such
 as `/api/h/v1/cex/...`. It must not share wallet execution routes, Agent Wallet
 authorization state, or OnchainOS card proofs.

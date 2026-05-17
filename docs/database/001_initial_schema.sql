@@ -17,6 +17,20 @@ create table if not exists users (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists h_wallet_sessions (
+  id text primary key,
+  user_id text not null references users(id),
+  token_hash text not null unique,
+  source text not null default 'agent-wallet-auth',
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
+create index if not exists h_wallet_sessions_user_status_idx
+  on h_wallet_sessions(user_id, status, expires_at desc);
+
 create table if not exists agent_wallets (
   id text primary key,
   user_id text not null references users(id),

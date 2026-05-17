@@ -36,6 +36,12 @@ Repository names should stay stable while implementations change:
 Stores the product user identity. Email is the first login path, but wallet and
 community identities can be added later.
 
+### h_wallet_sessions
+
+Stores H Wallet app sessions. Only token hashes are persisted; raw session
+tokens are returned once to the app after email OTP request or verification and
+then stored by the client in secure storage.
+
 ### agent_wallets
 
 Stores Agent Wallet binding metadata only. Do not store private keys or OKX API
@@ -94,9 +100,8 @@ contains a verified provider result.
 
 ### h_runtime_state
 
-Stores small backend runtime pointers such as the current local development
-user. This is not an authentication session model; production auth should use a
-real session boundary later.
+Stores small backend runtime pointers for local development fallback only. HTTP
+requests use the H Wallet session boundary, not a process-global current user.
 
 ### user_score_snapshots
 

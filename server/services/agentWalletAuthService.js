@@ -1,4 +1,7 @@
 const onchainosWalletAdapter = require('../adapters/onchainosWalletAdapter')
+const {
+  authSessionRepository,
+} = require('../repositories/authSessionRepository')
 const { createAgentWalletCreatedCard } = require('./cardsService')
 const {
   bindAgentWalletSession,
@@ -24,8 +27,9 @@ async function requestAgentWalletOtp(input) {
     email,
     requestId: session.requestId,
   })
+  const hWalletSession = createHWalletSession(identity.user.id)
 
-  return enrichAgentWalletSession(session, identity)
+  return enrichAgentWalletSession(session, identity, hWalletSession)
 }
 
 async function verifyAgentWalletOtp(input) {
@@ -42,7 +46,12 @@ async function verifyAgentWalletOtp(input) {
     email,
   })
   const identity = bindAgentWalletSession(session)
-  const enrichedSession = enrichAgentWalletSession(session, identity)
+  const hWalletSession = createHWalletSession(identity.user.id)
+  const enrichedSession = enrichAgentWalletSession(
+    session,
+    identity,
+    hWalletSession,
+  )
 
   return {
     ...enrichedSession,
@@ -66,9 +75,19 @@ function getCurrentIdentity() {
   return getCurrentUserIdentity()
 }
 
-function enrichAgentWalletSession(session, identity) {
+function createHWalletSession(userId) {
+  const { session, token } = authSessionRepository.createSession({ userId })
+
   return {
     ...session,
+    token,
+  }
+}
+
+function enrichAgentWalletSession(session, identity, hWalletSession = null) {
+  return {
+    ...session,
+    hWalletSession,
     userId: identity.user.id,
     userStatus: identity.user.status,
     walletBindingId: identity.agentWallet?.id,

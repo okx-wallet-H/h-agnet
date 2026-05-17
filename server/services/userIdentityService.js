@@ -1,7 +1,14 @@
+const { AsyncLocalStorage } = require('node:async_hooks')
 const {
   agentWalletRepository,
 } = require('../repositories/agentWalletRepository')
 const { userRepository } = require('../repositories/userRepository')
+
+const requestUserContext = new AsyncLocalStorage()
+
+function runWithRequestUser(userId, task) {
+  return requestUserContext.run({ userId: userId ?? null }, task)
+}
 
 function createOrUpdateEmailUser(email, patch = {}) {
   const normalizedEmail = normalizeEmail(email)
@@ -13,7 +20,7 @@ function createOrUpdateEmailUser(email, patch = {}) {
 }
 
 function getCurrentUserIdentity() {
-  const user = userRepository.getCurrentUser()
+  const user = getCurrentUser()
 
   if (!user) {
     return null
@@ -23,7 +30,19 @@ function getCurrentUserIdentity() {
 }
 
 function getCurrentUserId() {
-  return userRepository.getCurrentUser()?.id ?? null
+  return getCurrentUser()?.id ?? null
+}
+
+function getCurrentUser() {
+  const requestContext = requestUserContext.getStore()
+
+  if (requestContext) {
+    return requestContext.userId
+      ? userRepository.findById(requestContext.userId)
+      : null
+  }
+
+  return userRepository.getCurrentUser()
 }
 
 function markAgentWalletOtpRequested({ email, requestId }) {
@@ -120,4 +139,5 @@ module.exports = {
   getCurrentUserIdentity,
   markAgentWalletOtpRequested,
   normalizeEmail,
+  runWithRequestUser,
 }

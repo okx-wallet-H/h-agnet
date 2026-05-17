@@ -11,6 +11,9 @@ const {
   agentAuthorizationPolicyRepository,
 } = require('../repositories/agentAuthorizationPolicyRepository')
 const {
+  authSessionRepository,
+} = require('../repositories/authSessionRepository')
+const {
   agentWalletRepository,
 } = require('../repositories/agentWalletRepository')
 const { cardRepository } = require('../repositories/cardRepository')
@@ -29,6 +32,7 @@ async function bootstrapPersistence() {
   const state = await loadPersistedState()
 
   userRepository.hydrate(state.users, state.currentUserId)
+  authSessionRepository.hydrate(state.authSessions)
   agentWalletRepository.hydrate(state.agentWallets)
   cardRepository.hydrate(state.cards)
   agentConversationRepository.hydrate(

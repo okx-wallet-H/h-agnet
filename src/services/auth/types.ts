@@ -10,6 +10,7 @@ export type AgentWalletAuthStep =
 export type AgentWalletAuthSession = {
   email: string
   step: AgentWalletAuthStep
+  hWalletSession?: HWalletSession | null
   requestId?: string
   userId?: string
   userStatus?: string
@@ -21,6 +22,12 @@ export type AgentWalletAuthSession = {
   solAddress?: string
   loginType?: 'email' | 'api-key'
   walletCreatedCard?: ConversationCard
+}
+
+export type HWalletSession = {
+  token: string
+  userId: string
+  expiresAt: string
 }
 
 export type AgentWalletAuthRemoteStatus = {
