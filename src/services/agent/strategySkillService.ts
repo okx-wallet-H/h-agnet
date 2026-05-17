@@ -16,22 +16,11 @@ export function getHSkillRuntimeStatus() {
   return strategySkillApi.getHSkillRuntimeStatus()
 }
 
-export function listHSkillInvocations() {
-  return strategySkillApi.listHSkillInvocations()
-}
-
 export function dryRunHSkill(
   wrapperId: string,
   input?: Record<string, unknown>,
 ) {
   return strategySkillApi.dryRunHSkill(wrapperId, input)
-}
-
-export function invokeHSkill(
-  wrapperId: string,
-  input?: Record<string, unknown>,
-) {
-  return strategySkillApi.invokeHSkill(wrapperId, input)
 }
 
 export function getAgentRunnerStatus() {

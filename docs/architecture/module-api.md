@@ -38,6 +38,7 @@ H.agent.skills         → GET /api/h/v1/agent/skill-wrappers
 H.agent.skillRuntime   → GET /api/h/v1/agent/skill-runtime
 H.agent.skillDryRun    → POST /api/h/v1/agent/skill-runtime/dry-run
 H.agent.skillInvoke    → POST /api/h/v1/agent/skill-runtime/invoke (internal)
+H.agent.skillAudit     → GET /api/h/v1/agent/skill-runtime/invocations (internal)
 H.agent.runner         → GET /api/h/v1/agent/runner
 H.agent.runs           → GET /api/h/v1/agent/runs
 H.agent.start          → POST /api/h/v1/agent/strategies/:id/start

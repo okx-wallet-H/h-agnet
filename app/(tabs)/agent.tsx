@@ -17,7 +17,6 @@ import {
 import {
   useAgentRunnerStatus,
   useHSkillRuntimeStatus,
-  useInvokeHSkill,
   useOfficialStrategySkills,
   useStartOfficialStrategy,
 } from '../../src/features/agent/hooks/useStrategySkills'
@@ -46,7 +45,6 @@ export default function AgentScreen() {
   const skillRuntime = useHSkillRuntimeStatus()
   const officialStrategies = useOfficialStrategySkills()
   const startStrategy = useStartOfficialStrategy()
-  const invokeSkill = useInvokeHSkill()
   const { cards } = useConversationCards()
   const queueStats = getConfirmationQueueStats(cards)
   const visibleMessages = useMemo(
@@ -324,24 +322,9 @@ export default function AgentScreen() {
             />
           </View>
         ))}
-        <Button
-          fullWidth
-          variant="secondary"
-          disabled={!backendConfigured || invokeSkill.isPending}
-          onPress={() =>
-            invokeSkill.mutate({
-              wrapperId: 'H.skill.wallet.getPortfolio',
-              input: { reason: 'agent-runtime-preview' },
-            })
-          }
-        >
-          {invokeSkill.isPending ? '正在读取' : '测试读取钱包资产'}
-        </Button>
-        {invokeSkill.data ? (
-          <AppText color="textSecondary">
-            {invokeSkill.data.invocation.result.message}
-          </AppText>
-        ) : null}
+        <AppText color="textSecondary">
+          真实 Skill 调用由后端 Agent Runner 接管，前端只展示状态和卡片结果。
+        </AppText>
       </TerminalCard>
 
       <Button fullWidth onPress={() => router.push('/agent/strategy')}>

@@ -44,7 +44,7 @@ function getHSkillRuntimeStatus() {
     hSkillBindings: wrappers.map(getHSkillBindingStatus),
     wrapperCount: wrappers.length,
     invocationCount: invocations.length,
-    lastInvocation: invocations[0] ?? null,
+    lastInvocation: summarizeHSkillInvocation(invocations[0]),
     policy: {
       mode: 'read-preflight-only',
       reason:
@@ -158,6 +158,42 @@ async function invokeHSkill(input) {
 
 function listHSkillInvocations() {
   return strategySkillRepository.listHSkillInvocations()
+}
+
+function summarizeHSkillInvocation(invocation) {
+  if (!invocation) {
+    return null
+  }
+
+  return {
+    id: invocation.id,
+    wrapperId: invocation.wrapperId,
+    providerSkill: invocation.providerSkill,
+    status: invocation.status,
+    executionMode: invocation.executionMode,
+    createdAt: invocation.createdAt,
+    inputKeys: Object.keys(invocation.inputSummary ?? {}),
+    result: summarizeInvocationResult(invocation.result),
+  }
+}
+
+function summarizeInvocationResult(result) {
+  if (!result || typeof result !== 'object') {
+    return {
+      ok: false,
+      code: 'unknown',
+      message: '调用结果不可用。',
+    }
+  }
+
+  return {
+    ok: Boolean(result.ok),
+    code: typeof result.code === 'string' ? result.code : 'unknown',
+    message:
+      typeof result.message === 'string'
+        ? result.message
+        : '调用结果已记录。',
+  }
 }
 
 async function invokeWalletPortfolio(wrapper, input) {

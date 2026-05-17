@@ -2,8 +2,6 @@ import { apiRequest } from '../api/httpClient'
 import type {
   AgentRunnerStatus,
   HSkillDryRunResult,
-  HSkillInvocationResult,
-  HSkillInvocation,
   HSkillRuntimeStatus,
   HSkillWrapper,
   OfficialStrategySkill,
@@ -20,15 +18,10 @@ export type StrategySkillApi = {
   ) => Promise<StrategyPlanResult>
   listHSkillWrappers: () => Promise<HSkillWrapper[]>
   getHSkillRuntimeStatus: () => Promise<HSkillRuntimeStatus>
-  listHSkillInvocations: () => Promise<HSkillInvocation[]>
   dryRunHSkill: (
     wrapperId: string,
     input?: Record<string, unknown>,
   ) => Promise<HSkillDryRunResult>
-  invokeHSkill: (
-    wrapperId: string,
-    input?: Record<string, unknown>,
-  ) => Promise<HSkillInvocationResult>
   getAgentRunnerStatus: () => Promise<AgentRunnerStatus>
   listStrategyRuns: () => Promise<StrategyRun[]>
   startOfficialStrategy: (
@@ -53,17 +46,8 @@ export const strategySkillApi: StrategySkillApi = {
   getHSkillRuntimeStatus() {
     return apiRequest('/agent/skill-runtime')
   },
-  listHSkillInvocations() {
-    return apiRequest('/agent/skill-runtime/invocations')
-  },
   dryRunHSkill(wrapperId, input = {}) {
     return apiRequest('/agent/skill-runtime/dry-run', {
-      method: 'POST',
-      body: { wrapperId, input },
-    })
-  },
-  invokeHSkill(wrapperId, input = {}) {
-    return apiRequest('/agent/skill-runtime/invoke', {
       method: 'POST',
       body: { wrapperId, input },
     })

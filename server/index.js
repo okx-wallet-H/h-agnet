@@ -233,6 +233,7 @@ async function handleRequest(request, response) {
       request.method === 'GET' &&
       routePath === '/agent/skill-runtime/invocations'
     ) {
+      requireExecutionRequest(request)
       sendJson(response, 200, {
         ok: true,
         data: listHSkillInvocations(),

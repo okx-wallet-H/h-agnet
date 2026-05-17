@@ -9,6 +9,9 @@ const {
 const {
   agentConversationRepository,
 } = require('../server/repositories/agentConversationRepository')
+const {
+  strategySkillRepository,
+} = require('../server/repositories/strategySkillRepository')
 const { executeAgentCommand } = require('../server/agent/agentCommandPipeline')
 const { userRepository } = require('../server/repositories/userRepository')
 const {
@@ -37,6 +40,9 @@ const {
 const {
   recordTradeExecutionHandoff,
 } = require('../server/services/tradeExecutionHandoffService')
+const {
+  getHSkillRuntimeStatus,
+} = require('../server/services/hSkillRuntimeService')
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
@@ -48,6 +54,7 @@ async function main() {
   const authorizedBlockedPipeline = await smokeAuthorizedBlockedPipeline()
   const executionHandoff = smokeExecutionHandoff()
   const verificationBoundary = await smokeVerificationBoundary()
+  const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
 
   console.log(
     JSON.stringify(
@@ -61,6 +68,7 @@ async function main() {
         conversationOwnershipBoundary,
         conversationTurnLinking,
         executionHandoff,
+        hSkillRuntimeBoundary,
         verificationBoundary,
       },
       null,
@@ -462,10 +470,59 @@ async function smokeVerificationBoundary() {
   }
 }
 
+function smokeHSkillRuntimeBoundary() {
+  resetMemoryState()
+
+  strategySkillRepository.insertHSkillInvocation({
+    id: 'h-skill-invocation-sensitive-smoke',
+    wrapperId: 'H.skill.swap.quote',
+    providerSkill: 'okx-dex-swap',
+    status: 'completed',
+    executionMode: 'read-only-adapter',
+    createdAt: '2026-05-17T00:00:00.000Z',
+    inputSummary: {
+      walletAddress: '0xsensitivewalletaddress',
+      reason: 'sensitive user intent',
+    },
+    result: {
+      ok: true,
+      code: 'quote-read',
+      message: '已读取报价。',
+      data: {
+        providerResponse: {
+          raw: 'sensitive provider payload',
+        },
+        walletAddress: '0xsensitivewalletaddress',
+      },
+    },
+  })
+
+  const status = getHSkillRuntimeStatus()
+  const serializedStatus = JSON.stringify(status)
+
+  assert.equal(status.invocationCount, 1)
+  assert.equal(
+    status.lastInvocation.id,
+    'h-skill-invocation-sensitive-smoke',
+  )
+  assert.deepEqual(status.lastInvocation.inputKeys, ['walletAddress', 'reason'])
+  assert.equal(status.lastInvocation.result.code, 'quote-read')
+  assert.equal(serializedStatus.includes('providerResponse'), false)
+  assert.equal(serializedStatus.includes('sensitive provider payload'), false)
+  assert.equal(serializedStatus.includes('0xsensitivewalletaddress'), false)
+
+  return {
+    invocationCount: status.invocationCount,
+    rawProviderPayloadHidden: true,
+    rawInputValuesHidden: true,
+  }
+}
+
 function resetMemoryState() {
   cardRepository.hydrate([])
   agentConversationRepository.hydrate([], [])
   agentAuthorizationPolicyRepository.hydrate([])
+  strategySkillRepository.hydrateHSkillInvocations([])
   userRepository.hydrate([], null)
 
   const user = userRepository.upsertByEmail('smoke-card-logic@h-wallet.local', {

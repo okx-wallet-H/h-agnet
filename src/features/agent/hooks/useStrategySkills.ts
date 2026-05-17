@@ -6,9 +6,7 @@ import {
   getAgentRunnerStatus,
   getHSkillRuntimeStatus,
   getOfficialStrategyPlan,
-  invokeHSkill,
   listHSkillWrappers,
-  listHSkillInvocations,
   listOfficialStrategies,
   listStrategyRuns,
   runStrategyPreflight,
@@ -22,7 +20,6 @@ export const strategySkillKeys = {
     [...strategySkillKeys.all, 'plan', strategyId] as const,
   wrappers: () => [...strategySkillKeys.all, 'wrappers'] as const,
   runtime: () => [...strategySkillKeys.all, 'runtime'] as const,
-  invocations: () => [...strategySkillKeys.all, 'invocations'] as const,
   runner: () => [...strategySkillKeys.all, 'runner'] as const,
   runs: () => [...strategySkillKeys.all, 'runs'] as const,
 }
@@ -59,14 +56,6 @@ export function useHSkillRuntimeStatus() {
   })
 }
 
-export function useHSkillInvocations() {
-  return useQuery({
-    queryKey: strategySkillKeys.invocations(),
-    queryFn: listHSkillInvocations,
-    enabled: isApiConfigured(),
-  })
-}
-
 export function useDryRunHSkill() {
   const queryClient = useQueryClient()
 
@@ -81,31 +70,6 @@ export function useDryRunHSkill() {
     onSuccess() {
       void queryClient.invalidateQueries({
         queryKey: strategySkillKeys.runtime(),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: strategySkillKeys.invocations(),
-      })
-    },
-  })
-}
-
-export function useInvokeHSkill() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({
-      wrapperId,
-      input,
-    }: {
-      wrapperId: string
-      input?: Record<string, unknown>
-    }) => invokeHSkill(wrapperId, input),
-    onSuccess() {
-      void queryClient.invalidateQueries({
-        queryKey: strategySkillKeys.runtime(),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: strategySkillKeys.invocations(),
       })
     },
   })

@@ -129,6 +129,21 @@ export type HSkillInvocation = {
       }
 }
 
+export type HSkillInvocationSummary = {
+  id: string
+  wrapperId: string
+  providerSkill: string
+  status: HSkillInvocation['status']
+  executionMode: HSkillInvocation['executionMode']
+  createdAt: string
+  inputKeys: string[]
+  result: {
+    ok: boolean
+    code: string
+    message: string
+  }
+}
+
 export type HSkillRuntimeStatus = {
   status: 'contract-ready'
   realExecutionEnabled: boolean
@@ -146,7 +161,7 @@ export type HSkillRuntimeStatus = {
   }>
   wrapperCount: number
   invocationCount: number
-  lastInvocation: HSkillInvocation | null
+  lastInvocation: HSkillInvocationSummary | null
   policy: {
     mode: 'dry-run-only' | 'read-preflight-only'
     reason: string
@@ -154,11 +169,6 @@ export type HSkillRuntimeStatus = {
 }
 
 export type HSkillDryRunResult = {
-  invocation: HSkillInvocation
-  wrapper: HSkillWrapper
-}
-
-export type HSkillInvocationResult = {
   invocation: HSkillInvocation
   wrapper: HSkillWrapper
 }

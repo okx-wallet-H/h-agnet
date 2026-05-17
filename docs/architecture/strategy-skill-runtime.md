@@ -112,10 +112,18 @@ The first runtime contract is dry-run only:
 
 ```txt
 GET  /api/h/v1/agent/skill-runtime
-GET  /api/h/v1/agent/skill-runtime/invocations
 POST /api/h/v1/agent/skill-runtime/dry-run
 POST /api/h/v1/agent/skill-runtime/invoke
+GET  /api/h/v1/agent/skill-runtime/invocations
 ```
+
+`skill-runtime` is safe for the mobile client and returns only a sanitized
+runtime summary. It must not expose raw provider payloads, wallet responses, or
+full invocation inputs.
+
+`invoke` and `invocations` are internal runner/audit endpoints. They require the
+backend execution token (`H_WALLET_EXECUTION_TOKEN`) and must never be called
+directly from the mobile frontend.
 
 Dry-run validates wrapper identity, records an invocation, and returns a blocked
 result. It does not call OKX, OnchainOS, wallets, or provider APIs.
