@@ -43,6 +43,7 @@ const {
 const {
   getHSkillRuntimeStatus,
 } = require('../server/services/hSkillRuntimeService')
+const { requireExecutionRequest } = require('../server/http/executionAuth')
 
 async function main() {
   const conversationBoundary = await smokeConversationBoundary()
@@ -55,6 +56,7 @@ async function main() {
   const executionHandoff = smokeExecutionHandoff()
   const verificationBoundary = await smokeVerificationBoundary()
   const hSkillRuntimeBoundary = smokeHSkillRuntimeBoundary()
+  const executionAuthBoundary = smokeExecutionAuthBoundary()
 
   console.log(
     JSON.stringify(
@@ -67,6 +69,7 @@ async function main() {
         conversationBoundary,
         conversationOwnershipBoundary,
         conversationTurnLinking,
+        executionAuthBoundary,
         executionHandoff,
         hSkillRuntimeBoundary,
         verificationBoundary,
@@ -515,6 +518,53 @@ function smokeHSkillRuntimeBoundary() {
     invocationCount: status.invocationCount,
     rawProviderPayloadHidden: true,
     rawInputValuesHidden: true,
+  }
+}
+
+function smokeExecutionAuthBoundary() {
+  const originalToken = process.env.H_WALLET_EXECUTION_TOKEN
+
+  try {
+    delete process.env.H_WALLET_EXECUTION_TOKEN
+
+    assert.throws(
+      () => requireExecutionRequest({ headers: {} }),
+      (error) => error.code === 'execution-auth-not-configured',
+    )
+
+    process.env.H_WALLET_EXECUTION_TOKEN = 'smoke-execution-token'
+
+    assert.throws(
+      () =>
+        requireExecutionRequest({
+          headers: { authorization: 'Bearer wrong-token' },
+        }),
+      (error) => error.code === 'execution-unauthorized',
+    )
+
+    const runner = requireExecutionRequest({
+      headers: {
+        authorization: 'Bearer smoke-execution-token',
+        'x-h-wallet-runner-id': 'smoke-runner',
+      },
+    })
+
+    assert.deepEqual(runner, {
+      id: 'smoke-runner',
+      role: 'execution-runner',
+    })
+
+    return {
+      missingTokenRejected: true,
+      wrongTokenRejected: true,
+      validRunnerAccepted: true,
+    }
+  } finally {
+    if (originalToken === undefined) {
+      delete process.env.H_WALLET_EXECUTION_TOKEN
+    } else {
+      process.env.H_WALLET_EXECUTION_TOKEN = originalToken
+    }
   }
 }
 
