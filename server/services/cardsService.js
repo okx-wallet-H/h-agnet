@@ -3,7 +3,10 @@ const {
   applyAuthorizationGrantFromCard,
 } = require('./agentAuthorizationPolicyService')
 const { evaluateCardLibraryScore } = require('./scoringRulesService')
-const { getCurrentUserId } = require('./userIdentityService')
+const {
+  getCurrentUserId,
+  hasCurrentAgentWalletBinding,
+} = require('./userIdentityService')
 const {
   strategySkillRepository,
 } = require('../repositories/strategySkillRepository')
@@ -814,7 +817,7 @@ function confirmCardReview(cardId) {
     )
   }
 
-  if (card.metadata?.authorizationStatus === 'identity-required') {
+  if (getAuthorizationStatus(card) === 'identity-required') {
     throw createHttpError(
       409,
       'identity-required',
@@ -827,6 +830,14 @@ function confirmCardReview(cardId) {
       409,
       'authorization-not-required',
       '这张卡只是记录信息，不需要授权。',
+    )
+  }
+
+  if (!hasCurrentAgentWalletBinding()) {
+    throw createHttpError(
+      409,
+      'identity-required',
+      '请先完成 H Wallet 登录与 Agent Wallet 绑定，再进行授权。',
     )
   }
 

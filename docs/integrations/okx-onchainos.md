@@ -117,10 +117,12 @@ AI conversation
 → card library
 ```
 
-First trade authorization grants Agent execution for the current user. A
-withdrawal or transfer address can be reused after authorization; changing the
-address requires fresh authorization. OKX / OnchainOS confirming responses or
-risk blocks must still be surfaced to the user.
+First trade authorization grants Agent execution for the current user, but only
+after the H Wallet session resolves to a connected OKX Agent Wallet binding.
+OTP-requested users cannot grant asset autonomy yet. A withdrawal or transfer
+address can be reused after authorization; changing the address requires fresh
+authorization. OKX / OnchainOS confirming responses or risk blocks must still
+be surfaced to the user.
 
 No screen should directly call OKX, OnchainOS, wallet CLI commands, or provider
 SDKs.

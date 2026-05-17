@@ -7,6 +7,9 @@ const {
   agentAuthorizationPolicyRepository,
 } = require('../server/repositories/agentAuthorizationPolicyRepository')
 const {
+  agentWalletRepository,
+} = require('../server/repositories/agentWalletRepository')
+const {
   authSessionRepository,
 } = require('../server/repositories/authSessionRepository')
 const {
@@ -54,6 +57,10 @@ const {
   listSideQuests,
 } = require('../server/services/boostModuleService')
 const {
+  evaluateAgentAuthorization,
+  getAgentAuthorizationPolicySummary,
+} = require('../server/services/agentAuthorizationPolicyService')
+const {
   getAgentRunnerStatus,
   listStrategyRuns,
   runOfficialStrategyPreflight,
@@ -81,12 +88,15 @@ async function main() {
   const cardLibraryGrowthBoundary = await smokeCardLibraryGrowthBoundary()
   const strategyRunOwnershipBoundary = await smokeStrategyRunOwnershipBoundary()
   const sessionContextBoundary = await smokeSessionContextBoundary()
+  const agentWalletAuthorizationBoundary =
+    await smokeAgentWalletAuthorizationBoundary()
 
   console.log(
     JSON.stringify(
       {
         ok: true,
         authorizedBlockedPipeline,
+        agentWalletAuthorizationBoundary,
         anonymousReadBoundary,
         cardOwnershipBoundary,
         cardLibraryGrowthBoundary,
@@ -808,6 +818,63 @@ async function smokeSessionContextBoundary() {
   }
 }
 
+async function smokeAgentWalletAuthorizationBoundary() {
+  const connectedUser = resetMemoryState()
+  const connectedPolicy = getAgentAuthorizationPolicySummary()
+
+  assert.equal(connectedPolicy.status, 'active')
+  assert.equal(connectedPolicy.agentWallet.status, 'connected')
+
+  agentWalletRepository.hydrate([])
+  const disconnectedAuthorization = evaluateAgentAuthorization({
+    requiresAssetAction: true,
+    scope: 'strategy:stable-earn:v0',
+  })
+
+  assert.equal(
+    disconnectedAuthorization.authorizationStatus,
+    'identity-required',
+  )
+  assert.equal(disconnectedAuthorization.requiredUserAuthorization, true)
+
+  const disconnectedLaunch = startOfficialStrategySkill({
+    strategyId: 'official-stable-earn',
+  })
+
+  assert.equal(
+    disconnectedLaunch.card.metadata.authorizationStatus,
+    'identity-required',
+  )
+  prepareCardForConfirmation(disconnectedLaunch.card.id)
+  assert.throws(
+    () => confirmCardReview(disconnectedLaunch.card.id),
+    (error) => error.code === 'identity-required',
+  )
+
+  agentWalletRepository.upsertForUser(connectedUser.id, {
+    accountId: 'smoke-agent-wallet',
+    email: connectedUser.email,
+    evmAddress: '0x0000000000000000000000000000000000000001',
+    status: 'connected',
+  })
+
+  const connectedAuthorization = evaluateAgentAuthorization({
+    requiresAssetAction: true,
+    scope: 'strategy:stable-earn:v0',
+  })
+
+  assert.equal(
+    connectedAuthorization.authorizationStatus,
+    'authorization-required',
+  )
+
+  return {
+    connectedWalletPolicyActive: true,
+    disconnectedAuthorizationBlocked: true,
+    disconnectedConfirmationRejected: true,
+  }
+}
+
 async function smokeCardLibraryGrowthBoundary() {
   resetMemoryState()
 
@@ -962,6 +1029,7 @@ async function smokeCardLibraryGrowthBoundary() {
 
 function resetMemoryState() {
   cardRepository.hydrate([])
+  agentWalletRepository.hydrate([])
   agentConversationRepository.hydrate([], [])
   agentAuthorizationPolicyRepository.hydrate([])
   authSessionRepository.hydrate([])
@@ -974,6 +1042,12 @@ function resetMemoryState() {
     status: 'active',
   })
   userRepository.setCurrentUserId(user.id)
+  agentWalletRepository.upsertForUser(user.id, {
+    accountId: 'smoke-agent-wallet',
+    email: user.email,
+    evmAddress: '0x0000000000000000000000000000000000000001',
+    status: 'connected',
+  })
 
   return user
 }

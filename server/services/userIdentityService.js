@@ -33,6 +33,16 @@ function getCurrentUserId() {
   return getCurrentUser()?.id ?? null
 }
 
+function getCurrentAgentWalletBinding() {
+  const user = getCurrentUser()
+
+  return user ? agentWalletRepository.findByUserId(user.id) : null
+}
+
+function hasCurrentAgentWalletBinding() {
+  return getCurrentAgentWalletBinding()?.status === 'connected'
+}
+
 function getCurrentUser() {
   const requestContext = requestUserContext.getStore()
 
@@ -135,8 +145,10 @@ function throwBadRequest(message) {
 module.exports = {
   bindAgentWalletSession,
   createOrUpdateEmailUser,
+  getCurrentAgentWalletBinding,
   getCurrentUserId,
   getCurrentUserIdentity,
+  hasCurrentAgentWalletBinding,
   markAgentWalletOtpRequested,
   normalizeEmail,
   runWithRequestUser,

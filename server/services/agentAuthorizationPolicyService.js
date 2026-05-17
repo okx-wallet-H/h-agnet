@@ -1,17 +1,29 @@
 const {
   agentAuthorizationPolicyRepository,
 } = require('../repositories/agentAuthorizationPolicyRepository')
-const { getCurrentUserId } = require('./userIdentityService')
+const {
+  getCurrentAgentWalletBinding,
+  getCurrentUserId,
+  hasCurrentAgentWalletBinding,
+} = require('./userIdentityService')
 
 const policyVersion = 'agent-authorization-policy-v1'
 
 function getAgentAuthorizationPolicySummary() {
   const userId = getCurrentUserId()
+  const agentWallet = getCurrentAgentWalletBinding()
+  const agentWalletConnected = hasCurrentAgentWalletBinding()
 
   return {
     policyVersion,
     userId,
-    status: userId ? 'active' : 'identity-required',
+    agentWallet: agentWallet
+      ? {
+          id: agentWallet.id,
+          status: agentWallet.status,
+        }
+      : null,
+    status: userId && agentWalletConnected ? 'active' : 'identity-required',
     grants: agentAuthorizationPolicyRepository.list({ userId }),
     rules: [
       {
@@ -45,11 +57,12 @@ function evaluateAgentAuthorization(request = {}) {
     })
   }
 
-  if (!userId) {
+  if (!userId || !hasCurrentAgentWalletBinding()) {
     return createAuthorizationResult({
       authorizationStatus: 'identity-required',
       executionMode: 'authorization-required',
-      policyReason: '需要先完成 H Wallet 登录与 Agent Wallet 绑定。',
+      policyReason:
+        '需要先完成邮箱验证码，并创建或恢复 OKX Agent Wallet 后才能授权资产动作。',
       requiredUserAuthorization: true,
       safetyGate: 'identity-and-user-authorization-required',
       scope: request.scope,

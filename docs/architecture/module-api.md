@@ -483,6 +483,9 @@ Agent execution authorization is policy-based:
 
 * H Wallet does not introduce a password. Email OTP creates or restores the
   Agent Wallet session.
+* Asset actions require both an active H Wallet user session and a connected
+  OKX Agent Wallet binding. OTP-requested users cannot grant strategy, trade,
+  withdrawal, or transfer autonomy until wallet creation / restoration finishes.
 * First trade authorization grants `trade-autonomy` for the current user.
 * A withdrawal or transfer address must be authorized before autonomous reuse.
 * A changed withdrawal or transfer address requires a new user authorization.
